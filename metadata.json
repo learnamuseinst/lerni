@@ -1,0 +1,10 @@
+{
+  "name": "Lerni",
+  "description": "A gentle Material Expressive executive function companion for neurodivergent brains.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
