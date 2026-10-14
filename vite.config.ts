@@ -5,7 +5,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    base: '/lerni/',
+    base: '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       dedupe: ['react', 'react-dom'],
