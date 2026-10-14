@@ -29,7 +29,6 @@ const DEFAULT_HABITS: Habit[] = [
   {
     id: 'habit-1',
     title: 'Morning Water & Gentle Sip',
-    description: 'Place cup near bedside the night before to reduce friction.',
     timeBucket: 'morning',
     time: '08:00',
     durationMinutes: 5,
@@ -45,7 +44,6 @@ const DEFAULT_HABITS: Habit[] = [
   {
     id: 'habit-2',
     title: '30-Second Sun & Sky Gaze',
-    description: 'Natural light anchors circadian rhythm and raises dopamine.',
     timeBucket: 'morning',
     time: '08:15',
     durationMinutes: 5,
@@ -61,7 +59,6 @@ const DEFAULT_HABITS: Habit[] = [
   {
     id: 'habit-3',
     title: 'Midday Shoulder & Jaw Un-clench',
-    description: 'Physical reset to release sensory tension.',
     timeBucket: 'midday',
     time: '12:30',
     durationMinutes: 5,
@@ -77,7 +74,6 @@ const DEFAULT_HABITS: Habit[] = [
   {
     id: 'habit-4',
     title: '2-Minute Surface Rescue',
-    description: 'Put just 2 items back in their home.',
     timeBucket: 'evening',
     time: '21:00',
     durationMinutes: 10,
@@ -317,7 +313,11 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   theme: 'dark',
   accentColor: '#80D141',
   accentColorName: 'Lerni Green (Default)',
+  aiProvider: 'gemini',
   geminiApiKey: '',
+  geminiModel: 'gemini-3.1-flash-lite',
+  openRouterApiKey: '',
+  openRouterModel: 'google/gemini-2.5-flash',
   useSharedFreeKey: true,
   plannerCustomInstructions: '',
 };

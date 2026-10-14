@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Sparkles, Loader2 } from 'lucide-react';
-import { Habit, BujoEntry, FocusSession, UserPreferences, BrainDumpItem, ActiveSection, DEFAULT_NAV_ORDER } from './types';
+import { Habit, BujoEntry, FocusSession, UserPreferences, BrainDumpItem, ActiveSection, DEFAULT_NAV_ORDER, hasActiveAiKey } from './types';
 import { storage, getTodayDateString } from './utils/storage';
 import { soundEngine } from './utils/audioSynth';
 import { applyThemeToDocument, DEFAULT_ACCENT_COLOR } from './utils/themeColors';
@@ -201,7 +201,7 @@ export default function App() {
       language={prefs.language || 'en'}
       onLanguageChange={(lang) => handleUpdatePrefs({ language: lang })}
     >
-      <div className={`min-h-screen transition-colors duration-300 ${prefs.theme === 'dark' ? 'dark bg-[#121B11] text-[#E8F2E4]' : 'bg-[#F7FAF4] text-[#151E14]'}`}>
+      <div className={`min-h-screen transition-colors duration-300 ${prefs.theme === 'dark' ? 'dark bg-[#121B11] text-[#E8F2E4]' : 'bg-[#F4F7F1] text-[#151E14]'}`}>
         
         {/* Material Expressive Geometric Top Bar with Lerni Mascot */}
         <Header
@@ -266,6 +266,7 @@ export default function App() {
                     currentEnergy={prefs.currentEnergy}
                     categories={prefs.journalCategories}
                     onOpenSettings={handleOpenSettings}
+                    hasApiKey={hasActiveAiKey(prefs)}
                   />
                 </motion.div>
               )}
@@ -282,6 +283,8 @@ export default function App() {
                     habits={habits}
                     onUpdateHabits={handleUpdateHabits}
                     currentEnergy={prefs.currentEnergy}
+                    prefs={prefs}
+                    onOpenSettings={handleOpenSettings}
                   />
                 </motion.div>
               )}
@@ -305,6 +308,7 @@ export default function App() {
                     currentEnergy={prefs.currentEnergy}
                     categories={prefs.journalCategories}
                     onOpenSettings={handleOpenSettings}
+                    hasApiKey={hasActiveAiKey(prefs)}
                   />
                 </motion.div>
               )}

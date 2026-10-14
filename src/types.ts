@@ -14,10 +14,10 @@ export type TimeBucket = 'morning' | 'midday' | 'evening' | 'anytime';
 export interface Habit {
   id: string;
   title: string;
-  description?: string;
   timeBucket: TimeBucket;
   time?: string; // Optional HH:mm preferred anchor time (e.g. "08:00")
   durationMinutes?: number; // Optional duration in minutes (e.g. 5, 15, 30)
+  activeDays?: number[]; // Optional days of week [0..6] where 0=Sun..6=Sat. Undefined or length 7 means every day.
   energyCost: EnergyLevel;
   iconName?: string;
   color?: string;
@@ -30,7 +30,17 @@ export interface Habit {
   isArchived?: boolean;
 }
 
-export type BujoType = 'task' | 'note' | 'event' | 'habit_seed';
+export function isHabitActiveOnDate(habit: Habit, dateStr: string): boolean {
+  if (!habit.activeDays || habit.activeDays.length === 0 || habit.activeDays.length === 7) {
+    return true;
+  }
+  const [y, m, d] = dateStr.split('-').map((n) => parseInt(n, 10));
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return true;
+  const dateObj = new Date(y, m - 1, d);
+  return habit.activeDays.includes(dateObj.getDay());
+}
+
+export type BujoType = 'task' | 'note' | 'event';
 export type BujoStatus = 'open' | 'completed' | 'migrated' | 'cancelled';
 
 export interface MicroStep {
@@ -145,6 +155,11 @@ export const DEFAULT_FOCUS_TAB_ORDER: FocusTab[] = [
   'tracker',
 ];
 
+export type AiProvider = 'gemini' | 'openrouter';
+
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-lite';
+export const DEFAULT_OPENROUTER_MODEL = 'google/gemini-2.5-flash';
+
 export interface UserPreferences {
   userName: string;
   language?: Language; // 'en' (LTR) | 'fa' (RTL)
@@ -161,9 +176,21 @@ export interface UserPreferences {
   theme: 'light' | 'dark';
   accentColor: string; // e.g. '#80D141'
   accentColorName?: string;
+  aiProvider?: AiProvider; // 'gemini' | 'openrouter'
   geminiApiKey?: string; // Custom user-entered Gemini API key
+  geminiModel?: string; // Selected Gemini model ID
+  openRouterApiKey?: string; // Custom user-entered OpenRouter API key
+  openRouterModel?: string; // Selected OpenRouter model ID
   useSharedFreeKey?: boolean; // Whether the user uses the shared community free API key
   plannerCustomInstructions?: string; // Persistent custom instructions for smart planner
+}
+
+export function hasActiveAiKey(prefs: UserPreferences): boolean {
+  const provider: AiProvider = prefs.aiProvider || 'gemini';
+  if (provider === 'openrouter') {
+    return Boolean(prefs.openRouterApiKey && prefs.openRouterApiKey.trim() !== '');
+  }
+  return Boolean(prefs.geminiApiKey && prefs.geminiApiKey.trim() !== '');
 }
 
 export type Chronotype = 'morning' | 'afternoon' | 'evening' | 'balanced';

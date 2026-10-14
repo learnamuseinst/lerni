@@ -60,7 +60,7 @@ export const EditBrainDumpModal: React.FC<EditBrainDumpModalProps> = ({
         initial={{ opacity: 0, scale: 0.94, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.94, y: 15 }}
-        className="w-full max-w-lg p-5 sm:p-6 rounded-[28px] bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto"
+        className="w-full max-w-lg p-5 sm:p-6 rounded-[28px] bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto"
       >
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-3 border-b border-[#DCEAD4] dark:border-[#263722]">

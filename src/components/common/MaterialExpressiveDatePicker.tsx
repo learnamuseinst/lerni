@@ -196,7 +196,7 @@ export const MaterialExpressiveDatePicker: React.FC<MaterialExpressiveDatePicker
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: 16 }}
               transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-              className="w-full max-w-sm sm:max-w-md rounded-[28px] bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl overflow-hidden flex flex-col"
+              className="w-full max-w-sm sm:max-w-md rounded-[28px] bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl overflow-hidden flex flex-col"
             >
               {/* MD3 Expressive Header */}
               <div className="px-6 pt-5 pb-4 bg-[#EDF6E8] dark:bg-[#1C281A] border-b border-[#DCEAD4] dark:border-[#263722]">

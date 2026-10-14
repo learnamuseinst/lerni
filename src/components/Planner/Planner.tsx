@@ -26,6 +26,7 @@ import {
   DayPlan,
   ScheduleBlock,
   SchedulingConstraint,
+  hasActiveAiKey,
 } from '../../types';
 import { storage } from '../../utils/storage';
 import { getTodayKey, shiftDate, formatDateDisplay, getRelativeDayLabel } from '../../utils/dateUtils';
@@ -115,8 +116,18 @@ export const Planner: React.FC<PlannerProps> = ({
     setShowConfigModal(true);
   };
 
-  // Generate / Optimize Schedule with Gemini
+  // Generate / Optimize Schedule with AI
   const handleGenerateSchedule = async () => {
+    const hasUserApiKey = hasActiveAiKey(prefs);
+    if (!hasUserApiKey) {
+      soundEngine.playPop();
+      setShowConfigModal(false);
+      setErrorMessage(
+        t('planner.noApiKeyError', 'Please add your API key in Settings to generate AI-powered features.')
+      );
+      return;
+    }
+
     setIsGenerating(true);
     onGeneratingChange?.(true);
     setShowConfigModal(false);
@@ -184,6 +195,16 @@ export const Planner: React.FC<PlannerProps> = ({
         ...prev,
         [block.id]: !prev[block.id],
       }));
+      return;
+    }
+
+    const hasUserApiKey = hasActiveAiKey(prefs);
+    if (!hasUserApiKey) {
+      soundEngine.playPop();
+      setErrorMessage(
+        t('planner.noApiKeyError', 'Please add your API key in Settings to generate AI-powered features.')
+      );
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -378,24 +399,36 @@ export const Planner: React.FC<PlannerProps> = ({
 
         {errorMessage && (
           <motion.div
+            id="planner-api-key-alert"
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5 shadow-xs"
+            className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 flex items-center justify-between gap-3 shadow-xs"
           >
-            <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <span>{errorMessage}</span>
-              {/quota|api key/i.test(errorMessage) && (
-                <button
-                  type="button"
-                  onClick={onOpenSettings}
-                  className="mx-2 font-bold underline text-[#3B7E10] dark:text-[#80D141]"
-                >
-                  {language === 'fa' ? 'باز کردن تنظیمات برای ثبت کلید اختصاصی' : 'Open Settings to add your free personal key'}
-                </button>
-              )}
+            <div className="flex items-start gap-2.5 flex-1">
+              <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div className="flex-1 leading-relaxed">
+                <span className="font-medium">{errorMessage}</span>
+                {(/quota|api key|کلید|تنظیمات/i.test(errorMessage) || !prefs.geminiApiKey?.trim()) && (
+                  <button
+                    id="btn-planner-go-to-settings"
+                    type="button"
+                    onClick={onOpenSettings}
+                    className="mx-2 font-bold underline text-[#3B7E10] dark:text-[#80D141] hover:opacity-80 transition-opacity cursor-pointer"
+                  >
+                    {t('planner.openSettingsLink', 'Go to Settings')}
+                  </button>
+                )}
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setErrorMessage(null)}
+              className="p-1 rounded-full hover:bg-amber-200/50 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-300 transition-colors shrink-0 cursor-pointer"
+              aria-label={t('common.close', 'Close')}
+            >
+              <X className="w-4 h-4" />
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -647,6 +680,27 @@ export const Planner: React.FC<PlannerProps> = ({
             {/* Scrollable Form Content */}
             <div className="flex-1 overflow-y-auto overscroll-contain px-4 sm:px-8 py-6">
               <div className="max-w-2xl mx-auto space-y-5 text-xs">
+                {!hasActiveAiKey(prefs) && (
+                  <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5 shadow-2xs">
+                    <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div className="flex-1 leading-relaxed">
+                      <span className="font-medium">
+                        {t('planner.noApiKeyError', 'Please add your API key in Settings to generate AI-powered features.')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowConfigModal(false);
+                          onOpenSettings();
+                        }}
+                        className="mx-2 font-bold underline text-[#3B7E10] dark:text-[#80D141] hover:opacity-80 transition-opacity cursor-pointer"
+                      >
+                        {t('planner.openSettingsLink', 'Go to Settings')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Time Range with Now Button */}
                 <div className="space-y-1.5">
                   <label className="font-bold text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-1.5">

@@ -337,7 +337,7 @@ export const FocusTracker: React.FC<FocusTrackerProps> = ({
       ) : (
         <>
           {/* Visual Timer Hero Container */}
-          <div className="p-6 sm:p-8 rounded-[28px] bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-xs relative overflow-hidden">
+          <div className="p-6 sm:p-8 rounded-[28px] bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-xs relative overflow-hidden">
         
         {/* Ambient Glow / Pulse Background */}
         {isRunning && (
@@ -585,7 +585,7 @@ export const FocusTracker: React.FC<FocusTrackerProps> = ({
       </div>
 
       {/* Ambient Sound Synthesizer Card */}
-      <div className="p-5 rounded-[28px] bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] space-y-4">
+      <div className="p-5 rounded-[28px] bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] space-y-4">
         <div className="flex items-center gap-2">
           <Radio className="w-4 h-4 text-[#80D141]" />
           <h3 className="font-display text-sm font-bold text-[#151E14] dark:text-[#E8F2E4]">
@@ -630,7 +630,7 @@ export const FocusTracker: React.FC<FocusTrackerProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         
         {/* Minutes Today */}
-        <div className="p-4 rounded-2xl bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] flex items-center gap-3">
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1C3700] dark:text-[#80D141] flex items-center justify-center font-bold">
             <Zap className="w-5 h-5 fill-current" />
           </div>
@@ -645,7 +645,7 @@ export const FocusTracker: React.FC<FocusTrackerProps> = ({
         </div>
 
         {/* Sessions Completed */}
-        <div className="p-4 rounded-2xl bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] flex items-center gap-3">
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] text-[#3B7E10] dark:text-[#80D141] flex items-center justify-center font-bold">
             <Award className="w-5 h-5" />
           </div>
@@ -669,7 +669,7 @@ export const FocusTracker: React.FC<FocusTrackerProps> = ({
               initial={{ opacity: 0, scale: 0.92 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.92 }}
-              className="w-full max-w-md p-6 rounded-[28px] bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl text-center space-y-4"
+              className="w-full max-w-md p-6 rounded-[28px] bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl text-center space-y-4"
             >
               <span className="text-3xl">⚓</span>
               <h3 className="font-display text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
@@ -716,7 +716,7 @@ export const FocusTracker: React.FC<FocusTrackerProps> = ({
               initial={{ opacity: 0, scale: 0.92, y: 12 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.92, y: 12 }}
-              className="w-full max-w-md p-6 rounded-[28px] bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl space-y-4"
+              className="w-full max-w-md p-6 rounded-[28px] bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl space-y-4"
             >
               <div className="text-center space-y-1">
                 <span className="text-3xl">🎉</span>

@@ -44,7 +44,6 @@ export const SendToJournalModal: React.FC<SendToJournalModalProps> = ({
     task: { symbol: '⬜', label: t('journal.typeTask'), desc: language === 'fa' ? 'مورد کاری قابل انجام' : 'Actionable to-do item' },
     event: { symbol: '⏳', label: t('journal.typeEvent'), desc: language === 'fa' ? 'زمان‌بندی یا قرار ملاقات' : 'Scheduled time or appointment' },
     note: { symbol: '✒️', label: t('journal.typeNote'), desc: language === 'fa' ? 'تأمل، مشاهده یا ایده' : 'Reflection, observation, or idea' },
-    habit_seed: { symbol: '🌱', label: t('journal.typeHabitSeed'), desc: language === 'fa' ? 'عادت یا روتین جدید' : 'Routine or habit to cultivate' },
   };
 
   const [content, setContent] = useState('');
@@ -135,7 +134,7 @@ export const SendToJournalModal: React.FC<SendToJournalModalProps> = ({
         initial={{ opacity: 0, scale: 0.94, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.94, y: 15 }}
-        className="w-full max-w-lg p-5 sm:p-6 rounded-[28px] bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto"
+        className="w-full max-w-lg p-5 sm:p-6 rounded-[28px] bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto"
       >
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-3 border-b border-[#DCEAD4] dark:border-[#263722]">
@@ -169,7 +168,7 @@ export const SendToJournalModal: React.FC<SendToJournalModalProps> = ({
           <label className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4]">
             {t('journal.entryType')}
           </label>
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-3 gap-2">
             {(Object.keys(TYPE_CONFIG) as BujoType[]).map((tKey) => {
               const itemType = TYPE_CONFIG[tKey];
               const isSelected = type === tKey;

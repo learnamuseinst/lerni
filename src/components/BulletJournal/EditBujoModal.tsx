@@ -30,7 +30,6 @@ const TYPE_SYMBOLS: Record<BujoType, { symbol: string; typeKey: string; descKey:
   task: { symbol: '⬜', typeKey: 'journal.typeTask', descKey: 'journal.typeTaskDesc' },
   event: { symbol: '⏳', typeKey: 'journal.typeEvent', descKey: 'journal.typeEventDesc' },
   note: { symbol: '✒️', typeKey: 'journal.typeNote', descKey: 'journal.typeNoteDesc' },
-  habit_seed: { symbol: '🌱', typeKey: 'journal.typeHabitSeed', descKey: 'journal.typeHabitSeedDesc' },
 };
 
 export const EditBujoModal: React.FC<EditBujoModalProps> = ({
@@ -122,7 +121,7 @@ export const EditBujoModal: React.FC<EditBujoModalProps> = ({
         initial={{ opacity: 0, scale: 0.94, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.94, y: 15 }}
-        className="w-full max-w-lg p-5 sm:p-6 rounded-[28px] bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto"
+        className="w-full max-w-lg p-5 sm:p-6 rounded-[28px] bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto"
       >
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-3 border-b border-[#DCEAD4] dark:border-[#263722]">
@@ -146,7 +145,7 @@ export const EditBujoModal: React.FC<EditBujoModalProps> = ({
           <label className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4]">
             {t('journal.entryType')}
           </label>
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-3 gap-2">
             {(Object.keys(TYPE_SYMBOLS) as BujoType[]).map((tKey) => {
               const item = TYPE_SYMBOLS[tKey];
               const isSelected = type === tKey;

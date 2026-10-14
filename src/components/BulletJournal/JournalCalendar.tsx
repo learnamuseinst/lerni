@@ -140,7 +140,7 @@ export const JournalCalendar: React.FC<JournalCalendarProps> = ({
     : getMonthName(viewYear, viewMonth, 'en');
 
   return (
-    <div className="p-4 sm:p-5 rounded-[24px] bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-xs space-y-4">
+    <div className="p-4 sm:p-5 rounded-[24px] bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-xs space-y-4">
       
       {/* Calendar Header */}
       <div className="flex items-center justify-between gap-2">

@@ -1,5 +1,6 @@
-import { BujoEntry, Habit, FocusSession, UserPreferences, EnergyLevel, DayPlan, ScheduleBlock, Chronotype, PlanningPace, SensoryState, SchedulingConstraint } from '../types';
-import { getTodayKey, shiftDate, formatDateDisplay } from './dateUtils';
+import { GoogleGenAI, Type } from '@google/genai';
+import { BujoEntry, Habit, FocusSession, UserPreferences, EnergyLevel, DayPlan, ScheduleBlock, Chronotype, PlanningPace, SensoryState, SchedulingConstraint, AiProvider, DEFAULT_GEMINI_MODEL, DEFAULT_OPENROUTER_MODEL, isHabitActiveOnDate } from '../types';
+import { formatDateDisplay } from './dateUtils';
 
 interface GenerateScheduleParams {
   targetDate: string;
@@ -21,6 +22,189 @@ export interface OptimizationResult {
   isAiGenerated: boolean;
   source: 'gemini' | 'heuristic_fallback';
   message?: string;
+}
+
+// Helper function to call OpenRouter Chat Completions API directly from browser
+export async function callOpenRouter({
+  apiKey,
+  model = DEFAULT_OPENROUTER_MODEL,
+  systemInstruction,
+  userPrompt,
+  expectJson = true,
+}: {
+  apiKey: string;
+  model?: string;
+  systemInstruction?: string;
+  userPrompt: string;
+  expectJson?: boolean;
+}): Promise<string> {
+  const messages: Array<{ role: string; content: string }> = [];
+  if (systemInstruction) {
+    messages.push({ role: 'system', content: systemInstruction });
+  }
+  messages.push({ role: 'user', content: userPrompt });
+
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'https://lerni.app',
+      'X-Title': 'Lerni Focus & Executive Function Companion',
+    },
+    body: JSON.stringify({
+      model: model || DEFAULT_OPENROUTER_MODEL,
+      messages,
+    }),
+  });
+
+  const data: any = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const errMsg = data?.error?.message || data?.message || `OpenRouter API error (${response.status})`;
+    throw new Error(errMsg);
+  }
+
+  const rawText = data?.choices?.[0]?.message?.content?.trim() || '';
+  if (!rawText) {
+    throw new Error('Empty response received from OpenRouter model.');
+  }
+
+  if (!expectJson) {
+    return rawText;
+  }
+
+  // Strip markdown code fences if present
+  let cleaned = rawText
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+
+  // If model included conversational text before/after JSON object, extract the JSON block
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+  }
+
+  return cleaned;
+}
+
+// Test AI connection directly from browser (supports both Gemini and OpenRouter)
+export interface AiPromptTestResult {
+  valid: boolean;
+  message: string;
+  response?: string;
+  latencyMs: number;
+  provider: AiProvider;
+  model: string;
+}
+
+export async function testAiPrompt({
+  provider = 'gemini',
+  apiKey,
+  model,
+  prompt,
+}: {
+  provider: AiProvider;
+  apiKey?: string;
+  model?: string;
+  prompt: string;
+}): Promise<AiPromptTestResult> {
+  const startTime = performance.now();
+  const cleanKey = apiKey?.trim() || '';
+  const cleanPrompt = prompt?.trim() || 'What is the capital of France?';
+  const activeModel = provider === 'openrouter'
+    ? (model?.trim() || DEFAULT_OPENROUTER_MODEL)
+    : (model?.trim() || DEFAULT_GEMINI_MODEL);
+
+  if (!cleanKey) {
+    return {
+      valid: false,
+      message: provider === 'openrouter'
+        ? 'No OpenRouter API key provided. Please enter your API key.'
+        : 'No Gemini API key provided. Please enter your API key.',
+      latencyMs: 0,
+      provider,
+      model: activeModel,
+    };
+  }
+
+  try {
+    let reply = '';
+    if (provider === 'openrouter') {
+      reply = await callOpenRouter({
+        apiKey: cleanKey,
+        model: activeModel,
+        userPrompt: cleanPrompt,
+        expectJson: false,
+      });
+    } else {
+      const client = new GoogleGenAI({ apiKey: cleanKey });
+      const response = await client.models.generateContent({
+        model: activeModel,
+        contents: cleanPrompt,
+      });
+      reply = response.text?.trim() || '(No response text returned)';
+    }
+
+    const latencyMs = Math.round(performance.now() - startTime);
+    return {
+      valid: true,
+      message: 'Success',
+      response: reply,
+      latencyMs,
+      provider,
+      model: activeModel,
+    };
+  } catch (err: any) {
+    const latencyMs = Math.round(performance.now() - startTime);
+    console.error('AI prompt test error:', err?.message || err);
+    const isQuotaError = /quota|rate limit|429|resource exhausted|insufficient credits/i.test(err?.message || '');
+    const isAuthError = /api key not valid|invalid api key|unauthenticated|unauthorized|401|403|no auth credentials/i.test(err?.message || '');
+
+    let userFriendlyMsg = err?.message || 'Failed to communicate with AI provider.';
+    if (isAuthError) {
+      userFriendlyMsg = provider === 'openrouter'
+        ? 'Invalid OpenRouter API Key. Please verify your key from openrouter.ai/keys.'
+        : 'Invalid Gemini API Key. Please verify your key from Google AI Studio.';
+    } else if (isQuotaError) {
+      userFriendlyMsg = 'Quota or rate limit reached. Please check your account credits or rate limits.';
+    }
+
+    return {
+      valid: false,
+      message: userFriendlyMsg,
+      latencyMs,
+      provider,
+      model: activeModel,
+    };
+  }
+}
+
+export async function testAiConnection({
+  provider = 'gemini',
+  apiKey,
+  model,
+}: {
+  provider: AiProvider;
+  apiKey?: string;
+  model?: string;
+}): Promise<{ valid: boolean; message: string; model?: string; sampleResponse?: string }> {
+  const result = await testAiPrompt({
+    provider,
+    apiKey,
+    model,
+    prompt: "Respond with only 'OK'.",
+  });
+
+  return {
+    valid: result.valid,
+    message: result.valid
+      ? `${provider === 'openrouter' ? 'OpenRouter' : 'Gemini'} API connected successfully (${result.model})!`
+      : result.message,
+    model: result.model,
+    sampleResponse: result.response,
+  };
 }
 
 /**
@@ -45,7 +229,7 @@ export function derivePaceFromSensoryState(sensoryState?: SensoryState, currentE
   return 'balanced';
 }
 
-// Generate schedule via Gemini API endpoint with graceful local heuristic fallback
+// Generate schedule directly via Gemini or OpenRouter API from the browser with graceful local heuristic fallback
 export async function optimizeDailySchedule(params: GenerateScheduleParams): Promise<OptimizationResult> {
   const {
     targetDate,
@@ -76,97 +260,239 @@ export async function optimizeDailySchedule(params: GenerateScheduleParams): Pro
   const combinedCandidateEntries = [...targetDayEntries, ...backlogEntries];
 
   // If no journal entries exist, we can still generate an intentional template or use habits
-  const activeHabits = habits.filter((h) => !h.isArchived);
+  const activeHabits = habits.filter((h) => !h.isArchived && isHabitActiveOnDate(h, targetDate));
 
   // Compute focus stats
   const recentSessions = focusSessions.slice(0, 10);
   const totalFocusMinutes = Math.round(recentSessions.reduce((acc, s) => acc + s.durationSeconds, 0) / 60);
 
-  const payload = {
-    apiKey: prefs.geminiApiKey?.trim() || undefined,
+  const provider: AiProvider = prefs.aiProvider || 'gemini';
+  const currentEnergy = prefs.currentEnergy || 'medium';
+  const sensoryState = prefs.sensoryState || 'balanced';
+  const dayOfWeek = formatDateDisplay(targetDate, { showDayOfWeek: true, includeYear: false });
+
+  const constraintNote = schedulingConstraint === 'all_priority'
+    ? "PRIORITY MANDATE: Every task marked as 'isPriority: true' MUST be scheduled within the day range without exception."
+    : schedulingConstraint === 'all_tasks'
+    ? "FULL COMPLETION MANDATE: ALL provided open tasks must be scheduled within the day range (compress durations slightly or streamline transitions to fit them all)."
+    : "BALANCED CAPACITY: Schedule tasks comfortably according to current energy capacity, prioritizing key items without overload.";
+
+  const customInstructionNote = customInstructions && typeof customInstructions === 'string' && customInstructions.trim()
+    ? `\n8. USER'S CUSTOM SCHEDULING INSTRUCTIONS: "${customInstructions.trim()}". (Strictly adhere to and incorporate these specific guidelines).`
+    : '';
+
+  const systemInstruction = `You are Lerni's Intelligent Executive Function & Energy-Aware Schedule Planner.
+Your purpose is to synthesize a user's Bullet Journal tasks, recurring habits, and real-time neurodivergent energy patterns to create an empowering, realistic daily time-blocked schedule.
+
+CRITICAL NEURODIVERGENT (ADHD / EXECUTIVE FUNCTION) PRINCIPLES:
+1. ENERGY MATCHING: Match demanding/high cognitive load tasks (high energy) with peak predicted energy periods. Never stack two high-energy tasks back-to-back without a buffer or restorative break.
+2. LOW INITIATION FRICTION: For EVERY task block, break down the initiation barrier with 2-3 extremely small, ultra-clear micro starter steps (<2 minutes each, e.g., "Open tab and log in", "Write first bullet point").
+3. REALISTIC PACING: Respect the user's current sensory state (${sensoryState}) and current energy (${currentEnergy}). If the user is overwhelmed or low energy, schedule generous transitions, gentle warm-ups, and keep task durations shorter (15-25m).
+4. CHRONOTYPE & DAY BOUNDS: Align with chronotype '${chronotype}' between ${dayStartTime} and ${dayEndTime}.
+5. BUFFER & RESTORATIVE BLOCKS: Include sensory rest / somatic resets / hydration pauses between focused blocks.
+6. PRESERVE FIXED TIMES & HABITS: If a Journal entry or Habit has a designated 'time' (e.g. 08:00 for morning routine or 14:00 for doctor appointment), anchor it at that exact time and schedule other tasks around it. Respect each Habit's designated 'durationMinutes' and time bucket (morning, midday, evening, anytime) when creating schedule blocks.
+7. ${constraintNote}${customInstructionNote}`;
+
+  const promptPayload = {
     targetDate,
-    dayOfWeek: formatDateDisplay(targetDate, { showDayOfWeek: true, includeYear: false }),
-    currentEnergy: prefs.currentEnergy || 'medium',
-    sensoryState: prefs.sensoryState || 'balanced',
-    chronotype,
-    pace,
-    schedulingConstraint,
+    dayOfWeek: dayOfWeek || 'Today',
+    userStatus: {
+      currentEnergy,
+      sensoryState,
+      chronotype,
+      pace,
+    },
     customInstructions: customInstructions?.trim() || undefined,
-    dayStartTime,
-    dayEndTime,
-    bujoEntries: combinedCandidateEntries,
-    habits: activeHabits,
-    focusStats: {
+    dayTimeRange: { start: dayStartTime, end: dayEndTime },
+    journalEntries: combinedCandidateEntries.map((e) => ({
+      id: e.id,
+      content: e.content,
+      type: e.type,
+      status: e.status,
+      energyCost: e.energyCost,
+      durationMinutes: e.durationMinutes || (e.energyCost === 'high' ? 45 : e.energyCost === 'medium' ? 25 : 15),
+      time: e.time,
+      isPriority: Boolean(e.isPriority),
+      category: e.category || 'General',
+    })),
+    habits: activeHabits.map((h) => ({
+      id: h.id,
+      title: h.title,
+      timeBucket: h.timeBucket,
+      energyCost: h.energyCost,
+      time: h.time,
+      durationMinutes: h.durationMinutes || (h.energyCost === 'high' ? 20 : h.energyCost === 'medium' ? 10 : 5),
+      unstickTip: h.unstickTip,
+    })),
+    recentFocusStats: {
       totalMinutesLogged: totalFocusMinutes,
       sessionCount: recentSessions.length,
     },
   };
 
   try {
-    const res = await fetch('/api/gemini/optimize-schedule', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    let scheduleData: any;
 
-    const data = await res.json();
+    if (provider === 'openrouter') {
+      const orKey = prefs.openRouterApiKey?.trim() || '';
+      if (!orKey) {
+        throw new Error('No OpenRouter API key available. Please enter your OpenRouter API key in Settings.');
+      }
 
-    if (res.ok && data.success && data.data) {
-      const plan: DayPlan = {
-        date: targetDate,
-        summary: data.data.summary || 'Optimized energy-aware daily schedule created.',
-        predictedEnergyRhythm: data.data.predictedEnergyRhythm || {
-          morning: 'medium',
-          afternoon: 'high',
-          evening: 'low',
-          rhythmNote: 'Standard executive distribution curve.',
-        },
-        scheduleBlocks: (data.data.scheduleBlocks || []).map((b: any, idx: number) => ({
-          id: b.id || `block-${idx + 1}`,
-          startTime: b.startTime || '09:00',
-          endTime: b.endTime || '09:30',
-          title: b.title || 'Scheduled Block',
-          type: b.type || 'task',
-          energyDemand: (b.energyDemand as EnergyLevel) || 'medium',
-          durationMinutes: Number(b.durationMinutes) || 25,
-          bujoEntryId: b.bujoEntryId || undefined,
-          executiveRationale: b.executiveRationale || 'Strategically scheduled for your cognitive flow.',
-          microStarterSteps: Array.isArray(b.microStarterSteps) && b.microStarterSteps.length > 0 ? b.microStarterSteps : undefined,
-          isBreak: Boolean(b.isBreak || b.type === 'break' || b.type === 'micro_reset'),
-          completed: false,
-        })),
-        pacingAdvice: Array.isArray(data.data.pacingAdvice)
-          ? data.data.pacingAdvice
-          : ['Pace yourself and take sensory resets between deep focus blocks.'],
-        totalFocusMinutes: Number(data.data.totalFocusMinutes) || 120,
-        totalBreakMinutes: Number(data.data.totalBreakMinutes) || 45,
-        createdAt: Date.now(),
-      };
-
-      return {
-        plan,
-        isAiGenerated: true,
-        source: 'gemini',
-      };
-    } else {
-      // If server returned an error (e.g. quota or offline), fallback to heuristic engine
-      console.warn('AI endpoint issue, falling back to local heuristic scheduler:', data.message);
-      const fallbackPlan = generateLocalHeuristicSchedule(params, combinedCandidateEntries);
-      return {
-        plan: fallbackPlan,
-        isAiGenerated: false,
-        source: 'heuristic_fallback',
-        message: data.message || 'Generated using local smart heuristic scheduler.',
-      };
+      const jsonSchemaInstruction = `
+Return ONLY a valid JSON object matching this exact structure (no markdown fences, no commentary):
+{
+  "summary": "string (1-2 sentence overview)",
+  "predictedEnergyRhythm": {
+    "morning": "low | medium | high",
+    "afternoon": "low | medium | high",
+    "evening": "low | medium | high",
+    "rhythmNote": "string"
+  },
+  "scheduleBlocks": [
+    {
+      "id": "block-1",
+      "startTime": "HH:mm",
+      "endTime": "HH:mm",
+      "title": "string",
+      "type": "task | event | break | habit | micro_reset",
+      "energyDemand": "low | medium | high",
+      "durationMinutes": 25,
+      "bujoEntryId": "string or empty",
+      "executiveRationale": "string",
+      "isBreak": false
     }
+  ],
+  "pacingAdvice": ["tip 1", "tip 2", "tip 3"],
+  "totalFocusMinutes": 120,
+  "totalBreakMinutes": 45
+}`;
+
+      const responseText = await callOpenRouter({
+        apiKey: orKey,
+        model: prefs.openRouterModel?.trim() || DEFAULT_OPENROUTER_MODEL,
+        systemInstruction: `${systemInstruction}\n${jsonSchemaInstruction}`,
+        userPrompt: `Analyze these tasks and energy patterns to construct the optimal daily schedule:\n${JSON.stringify(promptPayload, null, 2)}`,
+        expectJson: true,
+      });
+
+      scheduleData = JSON.parse(responseText);
+    } else {
+      const geminiKey = prefs.geminiApiKey?.trim() || '';
+      if (!geminiKey) {
+        throw new Error('No Gemini API key available. Please enter your API key in Settings.');
+      }
+
+      const activeGeminiModel = prefs.geminiModel?.trim() || DEFAULT_GEMINI_MODEL;
+      const client = new GoogleGenAI({ apiKey: geminiKey });
+
+      const response = await client.models.generateContent({
+        model: activeGeminiModel,
+        contents: `Analyze these tasks and energy patterns to construct the optimal daily schedule:\n${JSON.stringify(promptPayload, null, 2)}`,
+        config: {
+          systemInstruction,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              summary: {
+                type: Type.STRING,
+                description: "Warm, empowering 1-2 sentence overview of how today's flow aligns with their energy.",
+              },
+              predictedEnergyRhythm: {
+                type: Type.OBJECT,
+                properties: {
+                  morning: { type: Type.STRING, description: "Predicted morning energy: 'low', 'medium', or 'high'" },
+                  afternoon: { type: Type.STRING, description: "Predicted afternoon energy: 'low', 'medium', or 'high'" },
+                  evening: { type: Type.STRING, description: "Predicted evening energy: 'low', 'medium', or 'high'" },
+                  rhythmNote: { type: Type.STRING, description: '1 sentence explaining the predicted energy curve.' },
+                },
+                required: ['morning', 'afternoon', 'evening', 'rhythmNote'],
+              },
+              scheduleBlocks: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    id: { type: Type.STRING, description: 'Unique block id, e.g. block-1' },
+                    startTime: { type: Type.STRING, description: 'HH:mm 24hr format, e.g. 09:00' },
+                    endTime: { type: Type.STRING, description: 'HH:mm 24hr format, e.g. 09:30' },
+                    title: { type: Type.STRING, description: 'Clear descriptive task or activity title' },
+                    type: { type: Type.STRING, description: "'task', 'event', 'break', 'habit', or 'micro_reset'" },
+                    energyDemand: { type: Type.STRING, description: "'low', 'medium', or 'high'" },
+                    durationMinutes: { type: Type.INTEGER, description: 'Duration in minutes' },
+                    bujoEntryId: { type: Type.STRING, description: 'Matched BujoEntry id if mapped, or empty string' },
+                    executiveRationale: { type: Type.STRING, description: 'Encouraging, ADHD-friendly reason for this placement' },
+                    isBreak: { type: Type.BOOLEAN, description: 'True if rest/recharge block' },
+                  },
+                  required: ['id', 'startTime', 'endTime', 'title', 'type', 'energyDemand', 'durationMinutes', 'executiveRationale'],
+                },
+              },
+              pacingAdvice: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: '3 concise, actionable executive-function tips tailored to their current state',
+              },
+              totalFocusMinutes: { type: Type.INTEGER, description: 'Sum of productive work minutes' },
+              totalBreakMinutes: { type: Type.INTEGER, description: 'Sum of scheduled rest minutes' },
+            },
+            required: ['summary', 'predictedEnergyRhythm', 'scheduleBlocks', 'pacingAdvice', 'totalFocusMinutes', 'totalBreakMinutes'],
+          },
+        },
+      });
+
+      const responseText = response.text?.trim();
+      if (!responseText) {
+        throw new Error('Empty response received from Gemini model.');
+      }
+
+      scheduleData = JSON.parse(responseText);
+    }
+
+    const plan: DayPlan = {
+      date: targetDate,
+      summary: scheduleData.summary || 'Optimized energy-aware daily schedule created.',
+      predictedEnergyRhythm: scheduleData.predictedEnergyRhythm || {
+        morning: 'medium',
+        afternoon: 'high',
+        evening: 'low',
+        rhythmNote: 'Standard executive distribution curve.',
+      },
+      scheduleBlocks: (scheduleData.scheduleBlocks || []).map((b: any, idx: number) => ({
+        id: b.id || `block-${idx + 1}`,
+        startTime: b.startTime || '09:00',
+        endTime: b.endTime || '09:30',
+        title: b.title || 'Scheduled Block',
+        type: b.type || 'task',
+        energyDemand: (b.energyDemand as EnergyLevel) || 'medium',
+        durationMinutes: Number(b.durationMinutes) || 25,
+        bujoEntryId: b.bujoEntryId || undefined,
+        executiveRationale: b.executiveRationale || 'Strategically scheduled for your cognitive flow.',
+        microStarterSteps: Array.isArray(b.microStarterSteps) && b.microStarterSteps.length > 0 ? b.microStarterSteps : undefined,
+        isBreak: Boolean(b.isBreak || b.type === 'break' || b.type === 'micro_reset'),
+        completed: false,
+      })),
+      pacingAdvice: Array.isArray(scheduleData.pacingAdvice)
+        ? scheduleData.pacingAdvice
+        : ['Pace yourself and take sensory resets between deep focus blocks.'],
+      totalFocusMinutes: Number(scheduleData.totalFocusMinutes) || 120,
+      totalBreakMinutes: Number(scheduleData.totalBreakMinutes) || 45,
+      createdAt: Date.now(),
+    };
+
+    return {
+      plan,
+      isAiGenerated: true,
+      source: 'gemini',
+    };
   } catch (err: any) {
-    console.warn('Network issue reaching Gemini API, using local smart scheduler:', err);
+    console.warn('AI API issue, falling back to local heuristic scheduler:', err?.message || err);
     const fallbackPlan = generateLocalHeuristicSchedule(params, combinedCandidateEntries);
     return {
       plan: fallbackPlan,
       isAiGenerated: false,
       source: 'heuristic_fallback',
-      message: 'Generated using local energy-aware scheduler (offline mode).',
+      message: err?.message || 'Generated using local energy-aware scheduler.',
     };
   }
 }
@@ -216,8 +542,8 @@ export function generateLocalHeuristicSchedule(
   let focusMins = 0;
   let breakMins = 0;
 
-  // Active unarchived habits
-  const activeHabits = habits.filter((h) => !h.isArchived);
+  // Active unarchived habits for the target date
+  const activeHabits = habits.filter((h) => !h.isArchived && isHabitActiveOnDate(h, targetDate));
   const morningHabits = activeHabits.filter((h) => h.timeBucket === 'morning');
   const middayHabits = activeHabits.filter((h) => h.timeBucket === 'midday');
   const eveningHabits = activeHabits.filter((h) => h.timeBucket === 'evening');
@@ -486,29 +812,83 @@ export function syncPlanToBujoEntries(plan: DayPlan, currentEntries: BujoEntry[]
   });
 }
 
-// Generate 2-minute starter steps for a single schedule block on demand
+// Generate 2-minute starter steps for a single schedule block on demand directly from the browser
 export async function generateStarterStepsForBlock(
   taskTitle: string,
   energyDemand: EnergyLevel = 'medium',
   prefs: UserPreferences
 ): Promise<string[]> {
   const isFa = prefs.language === 'fa';
-  try {
-    const res = await fetch('/api/gemini/generate-starter-steps', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        apiKey: prefs.geminiApiKey?.trim() || undefined,
-        taskTitle,
-        energyDemand,
-        sensoryState: prefs.sensoryState || 'balanced',
-        language: prefs.language || 'en',
-      }),
-    });
+  const sensoryState = prefs.sensoryState || 'balanced';
+  const provider: AiProvider = prefs.aiProvider || 'gemini';
 
-    const data = await res.json();
-    if (res.ok && data.success && Array.isArray(data.steps) && data.steps.length > 0) {
-      return data.steps;
+  const prompt = `You are an ADHD executive function initiation coach.
+The user wants to start this task: "${taskTitle}".
+Task cognitive energy level: ${energyDemand}.
+User sensory state: ${sensoryState}.
+Language target: ${isFa ? 'Persian (Farsi / فارسی)' : 'English'}.
+
+Generate exactly 3 gentle, concrete, ultra-low-friction 2-minute micro starter steps designed to break task paralysis and build initial dopamine momentum.
+Rules:
+1. Each step MUST take under 2 minutes (e.g., "Open tab and search document", "Write 1 messy bullet point", "Place notebook and pen on desk").
+2. Tone: warm, non-judgmental, zero cognitive load.
+3. Keep each step under 15 words.
+${isFa ? '4. IMPORTANT: Write all 3 starter steps strictly in natural, encouraging Persian (Farsi / فارسی).' : ''}`;
+
+  try {
+    if (provider === 'openrouter') {
+      const orKey = prefs.openRouterApiKey?.trim() || '';
+      if (!orKey) {
+        throw new Error('No OpenRouter API key available.');
+      }
+
+      const responseText = await callOpenRouter({
+        apiKey: orKey,
+        model: prefs.openRouterModel?.trim() || DEFAULT_OPENROUTER_MODEL,
+        systemInstruction: 'Return ONLY a valid JSON object with key "steps" containing an array of 3 strings: {"steps": ["step 1", "step 2", "step 3"]}.',
+        userPrompt: prompt,
+        expectJson: true,
+      });
+
+      const parsed = JSON.parse(responseText);
+      if (Array.isArray(parsed.steps) && parsed.steps.length > 0) {
+        return parsed.steps;
+      }
+    } else {
+      const geminiKey = prefs.geminiApiKey?.trim() || '';
+      if (!geminiKey) {
+        throw new Error('No Gemini API key available.');
+      }
+
+      const activeGeminiModel = prefs.geminiModel?.trim() || DEFAULT_GEMINI_MODEL;
+      const client = new GoogleGenAI({ apiKey: geminiKey });
+
+      const response = await client.models.generateContent({
+        model: activeGeminiModel,
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              steps: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: 'Exactly 3 low-barrier 2-minute initiation subtasks',
+              },
+            },
+            required: ['steps'],
+          },
+        },
+      });
+
+      const responseText = response.text?.trim();
+      if (responseText) {
+        const parsed = JSON.parse(responseText);
+        if (Array.isArray(parsed.steps) && parsed.steps.length > 0) {
+          return parsed.steps;
+        }
+      }
     }
   } catch (err) {
     console.warn('Network/API issue generating starter steps, using heuristic steps:', err);
@@ -529,4 +909,69 @@ export async function generateStarterStepsForBlock(
     'Work for 2 low-pressure minutes without judging quality'
   ];
 }
+
+// Generate a low-barrier 10-second "unstick" fallback micro-action for a habit using AI
+export async function generateTenSecondHabitFallback(
+  habitTitle: string,
+  energyCost: EnergyLevel = 'low',
+  prefs: UserPreferences
+): Promise<string> {
+  const isFa = prefs.language === 'fa';
+  const provider: AiProvider = prefs.aiProvider || 'gemini';
+
+  const systemInstruction = `You are an ADHD executive function initiation coach.
+Your job is to generate a single ultra-low-barrier, 10-second "unstick" micro-action for the user's habit to overcome initial friction and task paralysis.
+Rules:
+1. The micro-action MUST take 10 seconds or less (e.g. "Take 1 small sip of water", "Put on running shoes and touch the door handle", "Open book to page 1 without reading", "Sit on yoga mat for 3 deep breaths").
+2. Tone: Warm, forgiving, zero judgment. Emphasize that doing just this 10-second action counts as a 100% complete victory.
+3. Length: Keep it under 20 words maximum. Single sentence. No markdown code blocks.
+${isFa ? '4. Return ONLY in natural, encouraging Persian (Farsi / فارسی).' : '4. Return in concise English.'}`;
+
+  const prompt = `Habit: "${habitTitle}". Energy cost: ${energyCost}. Generate the 10-second fallback action.`;
+
+  try {
+    if (provider === 'openrouter') {
+      const orKey = prefs.openRouterApiKey?.trim() || '';
+      if (!orKey) {
+        throw new Error('No OpenRouter API key configured');
+      }
+
+      const responseText = await callOpenRouter({
+        apiKey: orKey,
+        model: prefs.openRouterModel?.trim() || DEFAULT_OPENROUTER_MODEL,
+        systemInstruction,
+        userPrompt: prompt,
+        expectJson: false,
+      });
+
+      const cleaned = responseText.replace(/^["'`]+|["'`]+$/g, '').trim();
+      if (cleaned) return cleaned;
+    } else {
+      const geminiKey = prefs.geminiApiKey?.trim() || '';
+      if (!geminiKey) {
+        throw new Error('No Gemini API key configured');
+      }
+
+      const activeGeminiModel = prefs.geminiModel?.trim() || DEFAULT_GEMINI_MODEL;
+      const client = new GoogleGenAI({ apiKey: geminiKey });
+
+      const response = await client.models.generateContent({
+        model: activeGeminiModel,
+        contents: `${systemInstruction}\n\n${prompt}`,
+      });
+
+      const responseText = response.text?.replace(/^["'`]+|["'`]+$/g, '').trim();
+      if (responseText) return responseText;
+    }
+  } catch (err) {
+    console.warn('Network/API issue generating 10s fallback, using heuristic fallback:', err);
+  }
+
+  // Empathetic heuristic fallback if offline or no key configured
+  if (isFa) {
+    return `فقط ۱۰ ثانیه برای «${habitTitle.slice(0, 24)}» وقت بگذار یا به وسایل آن دست بزن؛ همین مقدار یک پیروزی کامل است.`;
+  }
+  return `Just spend 10 seconds with "${habitTitle.slice(0, 24)}" or touch the equipment. Stopping immediately is 100% fine.`;
+}
+
 

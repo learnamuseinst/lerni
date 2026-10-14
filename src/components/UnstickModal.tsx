@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
-import { X, Sparkles, Zap, Play, CheckCircle2, Circle, RefreshCw } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { X, Sparkles, Zap, Play, CheckCircle2, Circle, RefreshCw, AlertCircle } from 'lucide-react';
 import { BujoEntry, MicroStep, EnergyLevel } from '../types';
 import { soundEngine } from '../utils/audioSynth';
 import { useI18n, toPersianDigits } from '../utils/i18n';
@@ -13,6 +13,8 @@ interface UnstickModalProps {
   onUpdateEntry: (updated: BujoEntry) => void;
   onSendToFocusTimer: (taskTitle: string, minutes: number) => void;
   currentEnergy: EnergyLevel;
+  hasApiKey?: boolean;
+  onOpenSettings?: () => void;
 }
 
 const DEFAULT_TASK_FA_MAP: Record<string, string> = {
@@ -74,23 +76,36 @@ export const UnstickModal: React.FC<UnstickModalProps> = ({
   onUpdateEntry,
   onSendToFocusTimer,
   currentEnergy,
+  hasApiKey = false,
+  onOpenSettings,
 }) => {
   const { t, language } = useI18n();
   const isPersian = language === 'fa';
 
   const [affirmation, setAffirmation] = useState('');
   const [contextInput, setContextInput] = useState('');
+  const [missingKeyError, setMissingKeyError] = useState<string | null>(null);
 
   // Sync affirmation when modal opens or language changes
   useEffect(() => {
     if (isOpen) {
       setAffirmation(t('unstick.affirmation'));
+      setMissingKeyError(null);
     }
   }, [isOpen, language, t]);
 
   if (!isOpen || !entry) return null;
 
   const handleGenerateMicroSteps = () => {
+    if (!hasApiKey) {
+      soundEngine.playPop();
+      setMissingKeyError(
+        t('planner.noApiKeyError', 'Please add your API key in Settings to generate AI-powered features.')
+      );
+      return;
+    }
+
+    setMissingKeyError(null);
     soundEngine.playGentleChime();
 
     // Instant local heuristic task decomposition
@@ -283,6 +298,35 @@ export const UnstickModal: React.FC<UnstickModalProps> = ({
               </p>
             </div>
           )}
+
+          {/* Missing API Key Banner */}
+          <AnimatePresence>
+            {missingKeyError && (
+              <motion.div
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5 shadow-xs"
+              >
+                <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <div className="flex-1 leading-relaxed">
+                  <span className="font-medium">{missingKeyError}</span>
+                  {onOpenSettings && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onOpenSettings();
+                      }}
+                      className="mx-2 font-bold underline text-[#3B7E10] dark:text-[#80D141] hover:opacity-80 transition-opacity cursor-pointer"
+                    >
+                      {t('planner.openSettingsLink', 'Go to Settings')}
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* If no microsteps generated yet, show Generate Button */}
           {microSteps.length === 0 ? (

@@ -81,7 +81,7 @@ export const ParalysisBusterModal: React.FC<ParalysisBusterModalProps> = ({
         initial={{ opacity: 0, scale: 0.92, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.92, y: 12 }}
-        className="w-full max-w-md rounded-[28px] bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl p-6 space-y-5 text-center"
+        className="w-full max-w-md rounded-[28px] bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl p-6 space-y-5 text-center"
       >
         {/* Header */}
         <div className="flex items-center justify-between">

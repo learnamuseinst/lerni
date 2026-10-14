@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Check, Zap, Sun, Clock, Moon, Sparkles, Heart, HelpCircle } from 'lucide-react';
+import { X, Check, Zap, Sun, Clock, Moon, Sparkles, Heart, HelpCircle, CalendarDays } from 'lucide-react';
 import { Habit, EnergyLevel, TimeBucket, ENERGY_LEVELS } from '../../types';
 import { soundEngine } from '../../utils/audioSynth';
 import { useI18n, getEnergyLabel } from '../../utils/i18n';
@@ -13,6 +13,8 @@ interface EditHabitModalProps {
   onSave: (updatedHabit: Habit) => void;
 }
 
+const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+
 export const EditHabitModal: React.FC<EditHabitModalProps> = ({
   habit,
   isOpen,
@@ -20,14 +22,46 @@ export const EditHabitModal: React.FC<EditHabitModalProps> = ({
   onSave,
 }) => {
   const { t, language } = useI18n();
+  const isFa = language === 'fa';
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
   const [timeBucket, setTimeBucket] = useState<TimeBucket>('morning');
   const [targetTime, setTargetTime] = useState<string>('');
   const [durationMinutes, setDurationMinutes] = useState<string>('');
+  const [activeDays, setActiveDays] = useState<number[]>(ALL_DAYS);
   const [energyCost, setEnergyCost] = useState<EnergyLevel>('low');
   const [unstickTip, setUnstickTip] = useState('');
   const [showUnstickHelp, setShowUnstickHelp] = useState(false);
+
+  const dayOptions = isFa
+    ? [
+        { day: 6, short: 'ش', full: 'شنبه' },
+        { day: 0, short: 'ی', full: 'یکشنبه' },
+        { day: 1, short: 'د', full: 'دوشنبه' },
+        { day: 2, short: 'س', full: 'سه‌شنبه' },
+        { day: 3, short: 'چ', full: 'چهارشنبه' },
+        { day: 4, short: 'پ', full: 'پنج‌شنبه' },
+        { day: 5, short: 'ج', full: 'جمعه' },
+      ]
+    : [
+        { day: 0, short: 'Su', full: 'Sunday' },
+        { day: 1, short: 'Mo', full: 'Monday' },
+        { day: 2, short: 'Tu', full: 'Tuesday' },
+        { day: 3, short: 'We', full: 'Wednesday' },
+        { day: 4, short: 'Th', full: 'Thursday' },
+        { day: 5, short: 'Fr', full: 'Friday' },
+        { day: 6, short: 'Sa', full: 'Saturday' },
+      ];
+
+  const toggleDay = (day: number) => {
+    soundEngine.playPop();
+    setActiveDays((prev) => {
+      if (prev.includes(day)) {
+        if (prev.length <= 1) return prev;
+        return prev.filter((d) => d !== day);
+      }
+      return [...prev, day].sort((a, b) => a - b);
+    });
+  };
 
   const timeBuckets: { id: TimeBucket; label: string; icon: React.ReactNode }[] = [
     { id: 'morning', label: t('habits.bucketMorning'), icon: <Sun className="w-4 h-4 text-amber-500" /> },
@@ -39,10 +73,12 @@ export const EditHabitModal: React.FC<EditHabitModalProps> = ({
   useEffect(() => {
     if (habit && isOpen) {
       setTitle(habit.title);
-      setDescription(habit.description || '');
       setTimeBucket(habit.timeBucket);
       setTargetTime(habit.time || '');
       setDurationMinutes(habit.durationMinutes ? String(habit.durationMinutes) : '');
+      setActiveDays(
+        habit.activeDays && habit.activeDays.length > 0 ? habit.activeDays : ALL_DAYS
+      );
       setEnergyCost(habit.energyCost);
       setUnstickTip(habit.unstickTip || '');
       setShowUnstickHelp(false);
@@ -67,14 +103,15 @@ export const EditHabitModal: React.FC<EditHabitModalProps> = ({
     if (!title.trim()) return;
 
     const parsedDuration = durationMinutes ? parseInt(durationMinutes, 10) : undefined;
+    const normalizedDays = activeDays.length === 7 || activeDays.length === 0 ? undefined : [...activeDays].sort((a, b) => a - b);
 
     const updated: Habit = {
       ...habit,
       title: title.trim(),
-      description: description.trim() || undefined,
       timeBucket,
       time: targetTime.trim() ? targetTime.trim() : undefined,
       durationMinutes: parsedDuration && !isNaN(parsedDuration) && parsedDuration > 0 ? parsedDuration : undefined,
+      activeDays: normalizedDays,
       energyCost,
       unstickTip: unstickTip.trim() || undefined,
     };
@@ -119,7 +156,7 @@ export const EditHabitModal: React.FC<EditHabitModalProps> = ({
           </button>
         </div>
 
-        {/* Title & Description */}
+        {/* Title & Repeat Days */}
         <div className="space-y-3">
           <div className="space-y-1">
             <label className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4]">
@@ -134,17 +171,84 @@ export const EditHabitModal: React.FC<EditHabitModalProps> = ({
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4]">
-              {t('habits.whyMatters')}
-            </label>
-            <input
-              type="text"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="e.g. Hydrates neurons after sleep..."
-              className="w-full px-4 py-2 rounded-2xl bg-[#EDF6E8] dark:bg-[#1E291C] border border-[#DCEAD4] dark:border-[#263722] text-xs text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
-            />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <label className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-1.5">
+                <CalendarDays className="w-3.5 h-3.5 text-[#3B7E10] dark:text-[#80D141]" />
+                <span>{t('habits.activeDaysLabel', 'Repeat Days')}</span>
+              </label>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEngine.playPop();
+                    setActiveDays(ALL_DAYS);
+                  }}
+                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                    activeDays.length === 7
+                      ? 'bg-[#80D141] text-[#0F2600]'
+                      : 'bg-[#EDF6E8] dark:bg-[#1E291C] text-[#485B44] dark:text-[#9EB598] border border-[#DCEAD4] dark:border-[#263722]'
+                  }`}
+                >
+                  {t('habits.everyDay', 'Every Day')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEngine.playPop();
+                    setActiveDays(isFa ? [6, 0, 1, 2, 3] : [1, 2, 3, 4, 5]);
+                  }}
+                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                    activeDays.length === 5 &&
+                    (isFa
+                      ? [6, 0, 1, 2, 3].every((d) => activeDays.includes(d))
+                      : [1, 2, 3, 4, 5].every((d) => activeDays.includes(d)))
+                      ? 'bg-[#80D141] text-[#0F2600]'
+                      : 'bg-[#EDF6E8] dark:bg-[#1E291C] text-[#485B44] dark:text-[#9EB598] border border-[#DCEAD4] dark:border-[#263722]'
+                  }`}
+                >
+                  {t('habits.weekdays', 'Weekdays')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEngine.playPop();
+                    setActiveDays(isFa ? [4, 5] : [0, 6]);
+                  }}
+                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                    activeDays.length === 2 &&
+                    (isFa
+                      ? [4, 5].every((d) => activeDays.includes(d))
+                      : [0, 6].every((d) => activeDays.includes(d)))
+                      ? 'bg-[#80D141] text-[#0F2600]'
+                      : 'bg-[#EDF6E8] dark:bg-[#1E291C] text-[#485B44] dark:text-[#9EB598] border border-[#DCEAD4] dark:border-[#263722]'
+                  }`}
+                >
+                  {t('habits.weekends', 'Weekends')}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1.5">
+              {dayOptions.map((item) => {
+                const isSelected = activeDays.includes(item.day);
+                return (
+                  <button
+                    key={item.day}
+                    type="button"
+                    onClick={() => toggleDay(item.day)}
+                    title={item.full}
+                    className={`py-2 rounded-2xl text-xs font-bold transition-all flex items-center justify-center cursor-pointer border ${
+                      isSelected
+                        ? 'bg-[#80D141] text-[#0F2600] border-[#80D141] shadow-xs'
+                        : 'bg-white dark:bg-[#202E1E] text-[#485B44] dark:text-[#9EB598] border-[#DCEAD4] dark:border-[#263722] hover:border-[#80D141]/50'
+                    }`}
+                  >
+                    {item.short}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 

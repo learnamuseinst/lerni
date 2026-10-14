@@ -34,13 +34,19 @@ import {
   ShieldCheck,
   Globe,
   Save,
-  Clock
+  Clock,
+  Copy,
+  Terminal,
+  Send,
+  MessageSquare,
+  Zap
 } from 'lucide-react';
-import { UserPreferences, NavSection, DEFAULT_NAV_ORDER, Language, FocusTab, DEFAULT_FOCUS_TAB_ORDER } from '../types';
+import { UserPreferences, NavSection, DEFAULT_NAV_ORDER, Language, FocusTab, DEFAULT_FOCUS_TAB_ORDER, AiProvider, DEFAULT_GEMINI_MODEL, DEFAULT_OPENROUTER_MODEL } from '../types';
 import { storage, DEFAULT_JOURNAL_CATEGORIES } from '../utils/storage';
 import { soundEngine } from '../utils/audioSynth';
 import { LerniMascot } from './Mascot/LerniMascot';
 import { useI18n, getCategoryLabel, translations, TranslationKey } from '../utils/i18n';
+import { testAiConnection, testAiPrompt } from '../utils/aiScheduler';
 
 interface SettingsSectionProps {
   prefs: UserPreferences;
@@ -75,7 +81,11 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
       const propsChanged =
         prevPrefsRef.current.language !== prefs.language ||
         prevPrefsRef.current.theme !== prefs.theme ||
+        prevPrefsRef.current.aiProvider !== prefs.aiProvider ||
         prevPrefsRef.current.geminiApiKey !== prefs.geminiApiKey ||
+        prevPrefsRef.current.geminiModel !== prefs.geminiModel ||
+        prevPrefsRef.current.openRouterApiKey !== prefs.openRouterApiKey ||
+        prevPrefsRef.current.openRouterModel !== prefs.openRouterModel ||
         prevPrefsRef.current.plannerCustomInstructions !== prefs.plannerCustomInstructions ||
         prevPrefsRef.current.navOrder !== prefs.navOrder ||
         prevPrefsRef.current.focusTabOrder !== prefs.focusTabOrder ||
@@ -84,6 +94,9 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
       if (propsChanged) {
         setDraftPrefs({ ...prefs });
         setApiKeyInput(prefs.geminiApiKey || '');
+        setGeminiModelInput(prefs.geminiModel || DEFAULT_GEMINI_MODEL);
+        setOpenRouterKeyInput(prefs.openRouterApiKey || '');
+        setOpenRouterModelInput(prefs.openRouterModel || DEFAULT_OPENROUTER_MODEL);
         setPlannerInstructionsInput(prefs.plannerCustomInstructions || '');
       }
       prevPrefsRef.current = prefs;
@@ -94,13 +107,32 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   const [newCatInput, setNewCatInput] = useState('');
   const [catError, setCatError] = useState<string | null>(null);
 
-  // Gemini API Key state
+  // AI Provider & API Key state
   const [apiKeyInput, setApiKeyInput] = useState(prefs.geminiApiKey || '');
+  const [geminiModelInput, setGeminiModelInput] = useState(prefs.geminiModel || DEFAULT_GEMINI_MODEL);
+  const [openRouterKeyInput, setOpenRouterKeyInput] = useState(prefs.openRouterApiKey || '');
+  const [openRouterModelInput, setOpenRouterModelInput] = useState(prefs.openRouterModel || DEFAULT_OPENROUTER_MODEL);
   const [showKey, setShowKey] = useState(false);
   const [testingKey, setTestingKey] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [keySavedMessage, setKeySavedMessage] = useState<string | null>(null);
-  const [serverHasSharedKey, setServerHasSharedKey] = useState<boolean | null>(null);
+
+  // Interactive API Key Tester / Playground state
+  const [testPromptInput, setTestPromptInput] = useState('');
+  const [testingPrompt, setTestingPrompt] = useState(false);
+  const [promptTestResult, setPromptTestResult] = useState<{
+    success: boolean;
+    prompt: string;
+    response: string;
+    error?: string;
+    latencyMs: number;
+    model: string;
+    provider: AiProvider;
+    timestamp: string;
+  } | null>(null);
+  const [copiedResponse, setCopiedResponse] = useState(false);
+
+  const selectedProvider: AiProvider = draftPrefs.aiProvider || prefs.aiProvider || 'gemini';
 
   // Smart Planner Custom Instructions state
   const [plannerInstructionsInput, setPlannerInstructionsInput] = useState(prefs.plannerCustomInstructions || '');
@@ -111,18 +143,17 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   const isDraftFa = isFa;
   const selectedLanguage: Language = draftPrefs.language || language || 'en';
 
-  useEffect(() => {
-    // Check server key configuration
-    fetch('/api/gemini/config')
-      .then((res) => res.json())
-      .then((data) => setServerHasSharedKey(Boolean(data.hasServerKey)))
-      .catch(() => setServerHasSharedKey(false));
-  }, []);
-
   // Update language in draft preferences only; does not apply until user clicks Save
   const handleLanguageChange = (newLang: Language) => {
     soundEngine.playGentleChime();
     setDraftPrefs((prev) => ({ ...prev, language: newLang }));
+  };
+
+  const handleProviderChange = (provider: AiProvider) => {
+    soundEngine.playPop();
+    setTestResult(null);
+    setKeySavedMessage(null);
+    setDraftPrefs((prev) => ({ ...prev, aiProvider: provider }));
   };
 
   const handleSavePlannerInstructions = (e?: React.FormEvent) => {
@@ -143,33 +174,54 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
 
   const handleSaveCustomKey = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const clean = apiKeyInput.trim();
     soundEngine.playGentleChime();
-    setDraftPrefs((prev) => ({ ...prev, geminiApiKey: clean, useSharedFreeKey: false }));
     setTestResult(null);
-    if (clean) {
-      setKeySavedMessage(isDraftFa ? 'کلید ثبت شد (برای اعمال، روی «ذخیره» کلیک کنید)' : 'Personal Gemini API key staged (click Save to apply)!');
-    } else {
-      setKeySavedMessage(isDraftFa ? 'کلید سفارشی پاک شد.' : 'Custom key cleared.');
-    }
-    setTimeout(() => setKeySavedMessage(null), 3500);
-  };
 
-  const handleUseSharedKey = () => {
-    soundEngine.playGentleChime();
-    setApiKeyInput('');
-    setDraftPrefs((prev) => ({ ...prev, geminiApiKey: '', useSharedFreeKey: true }));
-    setTestResult(null);
-    setKeySavedMessage(isDraftFa ? 'به سهمیه رایگان تغییر یافت (برای اعمال، روی «ذخیره» کلیک کنید)' : 'Switched to shared free key (click Save to apply).');
+    if (selectedProvider === 'openrouter') {
+      const cleanOrKey = openRouterKeyInput.trim();
+      const cleanModel = openRouterModelInput.trim() || DEFAULT_OPENROUTER_MODEL;
+      setDraftPrefs((prev) => ({
+        ...prev,
+        aiProvider: 'openrouter',
+        openRouterApiKey: cleanOrKey,
+        openRouterModel: cleanModel,
+      }));
+      if (cleanOrKey) {
+        setKeySavedMessage(isDraftFa ? 'کلید OpenRouter ثبت شد (برای اعمال، روی «ذخیره» کلیک کنید)' : 'OpenRouter API key staged (click Save to apply)!');
+      } else {
+        setKeySavedMessage(isDraftFa ? 'کلید OpenRouter پاک شد.' : 'OpenRouter key cleared.');
+      }
+    } else {
+      const clean = apiKeyInput.trim();
+      const cleanGeminiModel = geminiModelInput.trim() || DEFAULT_GEMINI_MODEL;
+      setDraftPrefs((prev) => ({
+        ...prev,
+        aiProvider: 'gemini',
+        geminiApiKey: clean,
+        geminiModel: cleanGeminiModel,
+        useSharedFreeKey: false,
+      }));
+      if (clean) {
+        setKeySavedMessage(isDraftFa ? 'کلید Gemini ثبت شد (برای اعمال، روی «ذخیره» کلیک کنید)' : 'Personal Gemini API key staged (click Save to apply)!');
+      } else {
+        setKeySavedMessage(isDraftFa ? 'کلید سفارشی پاک شد.' : 'Custom key cleared.');
+      }
+    }
     setTimeout(() => setKeySavedMessage(null), 3500);
   };
 
   const handleClearKey = () => {
     soundEngine.playPop();
-    setApiKeyInput('');
-    setDraftPrefs((prev) => ({ ...prev, geminiApiKey: '', useSharedFreeKey: false }));
     setTestResult(null);
-    setKeySavedMessage(isDraftFa ? 'کلید پاک شد.' : 'API key cleared.');
+    if (selectedProvider === 'openrouter') {
+      setOpenRouterKeyInput('');
+      setDraftPrefs((prev) => ({ ...prev, openRouterApiKey: '' }));
+      setKeySavedMessage(isDraftFa ? 'کلید OpenRouter پاک شد.' : 'OpenRouter API key cleared.');
+    } else {
+      setApiKeyInput('');
+      setDraftPrefs((prev) => ({ ...prev, geminiApiKey: '', useSharedFreeKey: false }));
+      setKeySavedMessage(isDraftFa ? 'کلید پاک شد.' : 'API key cleared.');
+    }
     setTimeout(() => setKeySavedMessage(null), 3000);
   };
 
@@ -179,35 +231,131 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     soundEngine.playPop();
 
     try {
-      const activeKey = apiKeyInput.trim() || draftPrefs.geminiApiKey?.trim() || prefs.geminiApiKey?.trim();
-      const res = await fetch('/api/gemini/test-key', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          apiKey: activeKey || undefined,
-        }),
+      const isOpenRouter = selectedProvider === 'openrouter';
+      const activeKey = isOpenRouter
+        ? (openRouterKeyInput.trim() || draftPrefs.openRouterApiKey?.trim() || prefs.openRouterApiKey?.trim())
+        : (apiKeyInput.trim() || draftPrefs.geminiApiKey?.trim() || prefs.geminiApiKey?.trim());
+      const activeModel = isOpenRouter
+        ? (openRouterModelInput.trim() || draftPrefs.openRouterModel || DEFAULT_OPENROUTER_MODEL)
+        : (geminiModelInput.trim() || draftPrefs.geminiModel || DEFAULT_GEMINI_MODEL);
+
+      const data = await testAiConnection({
+        provider: selectedProvider,
+        apiKey: activeKey || undefined,
+        model: activeModel,
       });
-      const data = await res.json();
-      if (res.ok && data.valid) {
+
+      if (data.valid) {
         soundEngine.playGentleChime();
         setTestResult({
           success: true,
-          message: data.message || (isDraftFa ? 'اتصال به Gemini با موفقیت برقرار شد!' : 'Connected to Gemini API successfully!'),
+          message: data.message || (isDraftFa ? 'اتصال با موفقیت برقرار شد!' : 'Connected to AI API successfully!'),
         });
       } else {
         soundEngine.playPop();
         setTestResult({
           success: false,
-          message: data.message || (isDraftFa ? 'عدم امکان اتصال به Gemini.' : 'Could not connect to Gemini API.'),
+          message: data.message || (isDraftFa ? 'عدم امکان اتصال به سرویس هوش مصنوعی.' : 'Could not connect to AI API.'),
         });
       }
     } catch (err: any) {
       setTestResult({
         success: false,
-        message: err.message || (isDraftFa ? 'خطای شبکه در بررسی اتصال.' : 'Network error while testing Gemini connection.'),
+        message: err.message || (isDraftFa ? 'خطای شبکه در بررسی اتصال.' : 'Network error while testing connection.'),
       });
     } finally {
       setTestingKey(false);
+    }
+  };
+
+  const handleSendTestPrompt = async (customPrompt?: string) => {
+    const promptToSend = (typeof customPrompt === 'string' ? customPrompt : testPromptInput).trim();
+    if (!promptToSend) return;
+
+    const isOpenRouter = selectedProvider === 'openrouter';
+    const activeKey = isOpenRouter
+      ? (openRouterKeyInput.trim() || draftPrefs.openRouterApiKey?.trim() || prefs.openRouterApiKey?.trim())
+      : (apiKeyInput.trim() || draftPrefs.geminiApiKey?.trim() || prefs.geminiApiKey?.trim());
+    const activeModel = isOpenRouter
+      ? (openRouterModelInput.trim() || draftPrefs.openRouterModel || DEFAULT_OPENROUTER_MODEL)
+      : (geminiModelInput.trim() || draftPrefs.geminiModel || DEFAULT_GEMINI_MODEL);
+
+    if (!activeKey) {
+      soundEngine.playPop();
+      setPromptTestResult({
+        success: false,
+        prompt: promptToSend,
+        response: '',
+        error: t('settings.missingKeyPromptError', 'Please enter an API key above before sending a test query.'),
+        latencyMs: 0,
+        model: activeModel,
+        provider: selectedProvider,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      });
+      return;
+    }
+
+    setTestingPrompt(true);
+    soundEngine.playPop();
+
+    try {
+      const result = await testAiPrompt({
+        provider: selectedProvider,
+        apiKey: activeKey,
+        model: activeModel,
+        prompt: promptToSend,
+      });
+
+      if (result.valid) {
+        soundEngine.playGentleChime();
+        setPromptTestResult({
+          success: true,
+          prompt: promptToSend,
+          response: result.response || '',
+          latencyMs: result.latencyMs,
+          model: result.model,
+          provider: result.provider,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        });
+      } else {
+        soundEngine.playPop();
+        setPromptTestResult({
+          success: false,
+          prompt: promptToSend,
+          response: '',
+          error: result.message,
+          latencyMs: result.latencyMs,
+          model: result.model,
+          provider: result.provider,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        });
+      }
+    } catch (err: any) {
+      soundEngine.playPop();
+      setPromptTestResult({
+        success: false,
+        prompt: promptToSend,
+        response: '',
+        error: err?.message || 'Error occurred while contacting AI service.',
+        latencyMs: 0,
+        model: activeModel,
+        provider: selectedProvider,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      });
+    } finally {
+      setTestingPrompt(false);
+    }
+  };
+
+  const handleCopyTestResponse = async () => {
+    if (!promptTestResult?.response) return;
+    try {
+      await navigator.clipboard.writeText(promptTestResult.response);
+      soundEngine.playGentleChime();
+      setCopiedResponse(true);
+      setTimeout(() => setCopiedResponse(false), 2000);
+    } catch {
+      // Fallback
     }
   };
 
@@ -233,8 +381,11 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     draftPrefs.theme !== prefs.theme ||
     (draftPrefs.soundEffectsEnabled ?? true) !== (prefs.soundEffectsEnabled ?? true) ||
     (draftPrefs.soundAlerts ?? true) !== (prefs.soundAlerts ?? true) ||
-    Boolean(draftPrefs.useSharedFreeKey) !== Boolean(prefs.useSharedFreeKey) ||
+    selectedProvider !== (prefs.aiProvider || 'gemini') ||
     apiKeyInput.trim() !== (prefs.geminiApiKey || '') ||
+    (geminiModelInput.trim() || DEFAULT_GEMINI_MODEL) !== (prefs.geminiModel || DEFAULT_GEMINI_MODEL) ||
+    openRouterKeyInput.trim() !== (prefs.openRouterApiKey || '') ||
+    (openRouterModelInput.trim() || DEFAULT_OPENROUTER_MODEL) !== (prefs.openRouterModel || DEFAULT_OPENROUTER_MODEL) ||
     plannerInstructionsInput.trim() !== (prefs.plannerCustomInstructions || '') ||
     JSON.stringify(currentNavOrder) !== JSON.stringify(initialNavOrder) ||
     JSON.stringify(currentFocusTabOrder) !== JSON.stringify(initialFocusTabOrder) ||
@@ -244,6 +395,9 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   const handleDone = () => {
     soundEngine.playGentleChime();
     const cleanApiKey = apiKeyInput.trim();
+    const cleanGeminiModel = geminiModelInput.trim() || DEFAULT_GEMINI_MODEL;
+    const cleanOpenRouterKey = openRouterKeyInput.trim();
+    const cleanOpenRouterModel = openRouterModelInput.trim() || DEFAULT_OPENROUTER_MODEL;
     const targetLang = draftPrefs.language || prefs.language || 'en';
     const finalPrefs: UserPreferences = {
       ...draftPrefs,
@@ -251,8 +405,12 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
       navOrder: currentNavOrder,
       focusTabOrder: currentFocusTabOrder,
       journalCategories: currentCategories,
-      geminiApiKey: draftPrefs.useSharedFreeKey ? '' : cleanApiKey,
-      useSharedFreeKey: cleanApiKey ? false : Boolean(draftPrefs.useSharedFreeKey),
+      aiProvider: selectedProvider,
+      geminiApiKey: cleanApiKey,
+      geminiModel: cleanGeminiModel,
+      openRouterApiKey: cleanOpenRouterKey,
+      openRouterModel: cleanOpenRouterModel,
+      useSharedFreeKey: false,
       plannerCustomInstructions: plannerInstructionsInput.trim(),
     };
     if (targetLang !== language) {
@@ -528,7 +686,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
             </div>
           </section>
           
-          {/* Feature: Gemini AI API Key Configuration */}
+          {/* Feature: AI Provider & API Key Configuration */}
           <section id="section-settings-gemini" className="p-5 sm:p-6 rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm space-y-4">
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2.5">
@@ -538,125 +696,272 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
-                      {t('settings.geminiSection', 'Gemini AI Configuration')}
+                      {t('settings.geminiSection', 'AI Provider & API Key')}
                     </h3>
                   </div>
                   <p className="text-xs text-[#485B44] dark:text-[#9EB598]">
-                    {t('settings.geminiDesc', 'Fast schedule generator and gentle task breakdown')}
+                    {t('settings.geminiDesc', 'Configure Google Gemini or OpenRouter for smart scheduling & task breakdown')}
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Free Community Shared Key vs Custom Personal Key Option */}
+            {/* AI Provider Selector Tabs */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                id="btn-provider-gemini"
+                type="button"
+                onClick={() => handleProviderChange('gemini')}
+                className={`p-3 rounded-2xl flex items-center justify-between border transition-all text-start cursor-pointer ${
+                  selectedProvider === 'gemini'
+                    ? 'bg-[#80D141]/15 dark:bg-[#80D141]/20 border-[#80D141] shadow-xs ring-1 ring-[#80D141]'
+                    : 'bg-[#F7FAF4] dark:bg-[#1C2919] text-[#485B44] dark:text-[#9EB598] border-[#DCEAD4] dark:border-[#2A3E26] hover:bg-[#E2F5D1]'
+                }`}
+              >
+                <div>
+                  <div className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                    {t('settings.providerGemini', 'Google Gemini')}
+                  </div>
+                  <div className="text-[10px] text-[#485B44] dark:text-[#9EB598]">
+                    {isDraftFa ? 'مدل سریع Gemini Flash' : 'Direct Google AI Studio'}
+                  </div>
+                </div>
+                {selectedProvider === 'gemini' && (
+                  <div className="w-5 h-5 rounded-full bg-[#80D141] text-[#0F2600] flex items-center justify-center shrink-0">
+                    <Check className="w-3 h-3 stroke-[3]" />
+                  </div>
+                )}
+              </button>
+
+              <button
+                id="btn-provider-openrouter"
+                type="button"
+                onClick={() => handleProviderChange('openrouter')}
+                className={`p-3 rounded-2xl flex items-center justify-between border transition-all text-start cursor-pointer ${
+                  selectedProvider === 'openrouter'
+                    ? 'bg-[#80D141]/15 dark:bg-[#80D141]/20 border-[#80D141] shadow-xs ring-1 ring-[#80D141]'
+                    : 'bg-[#F7FAF4] dark:bg-[#1C2919] text-[#485B44] dark:text-[#9EB598] border-[#DCEAD4] dark:border-[#2A3E26] hover:bg-[#E2F5D1]'
+                }`}
+              >
+                <div>
+                  <div className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                    {t('settings.providerOpenRouter', 'OpenRouter')}
+                  </div>
+                  <div className="text-[10px] text-[#485B44] dark:text-[#9EB598]">
+                    {isDraftFa ? 'دسترسی به تمام مدل‌های هوش مصنوعی' : 'Multi-model AI router'}
+                  </div>
+                </div>
+                {selectedProvider === 'openrouter' && (
+                  <div className="w-5 h-5 rounded-full bg-[#80D141] text-[#0F2600] flex items-center justify-center shrink-0">
+                    <Check className="w-3 h-3 stroke-[3]" />
+                  </div>
+                )}
+              </button>
+            </div>
+
+            {/* Active Provider Key & Model Configuration */}
             <div className="p-4 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4]">
-                      {isDraftFa ? 'سهمیه اشتراکی رایگان لرنی' : 'Free Community Gemini Key'}
+              {selectedProvider === 'gemini' ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-1.5">
+                      <Key className="w-3.5 h-3.5 text-[#80D141]" />
+                      <span>{t('settings.customApiKey', 'Personal Gemini API Key')}</span>
+                    </label>
+
+                    {(draftPrefs.geminiApiKey || apiKeyInput) && (
+                      <button
+                        type="button"
+                        onClick={handleClearKey}
+                        className="text-[11px] text-[#B3261E] dark:text-[#F2B8B5] hover:underline font-medium cursor-pointer"
+                      >
+                        {isDraftFa ? 'پاک کردن کلید' : 'Clear key'}
+                      </button>
+                    )}
+                  </div>
+
+                  <form onSubmit={handleSaveCustomKey} className="space-y-3">
+                    <div className="relative flex items-center">
+                      <input
+                        type={showKey ? 'text' : 'password'}
+                        value={apiKeyInput}
+                        onChange={(e) => setApiKeyInput(e.target.value)}
+                        placeholder={isDraftFa ? 'کلید اختصاصی خود (AIzaSy...) را وارد کنید' : 'Paste your API key (AIzaSy...)'}
+                        className="w-full pl-3.5 pr-20 py-2.5 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs font-mono text-[#151E14] dark:text-[#E8F2E4] placeholder:font-sans placeholder:text-[#79747E] dark:placeholder:text-[#8D9E8A] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowKey(!showKey)}
+                        className="absolute right-2.5 p-1 rounded-lg text-[#79747E] hover:text-[#151E14] dark:hover:text-[#E8F2E4] transition-colors cursor-pointer"
+                        title={showKey ? 'Hide key' : 'Show key'}
+                      >
+                        {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+
+                    {/* Gemini Model Text Field */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-[#151E14] dark:text-[#E8F2E4] block">
+                        {t('settings.geminiModel', 'Gemini Model')}
+                      </label>
+                      <input
+                        type="text"
+                        value={geminiModelInput}
+                        onChange={(e) => setGeminiModelInput(e.target.value)}
+                        placeholder="gemini-3.1-flash-lite"
+                        className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs font-mono text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="submit"
+                        disabled={
+                          !apiKeyInput.trim() ||
+                          (apiKeyInput === (draftPrefs.geminiApiKey || '') &&
+                            geminiModelInput === (draftPrefs.geminiModel || DEFAULT_GEMINI_MODEL))
+                        }
+                        className="px-4 py-2 rounded-xl bg-[#80D141] hover:bg-[#72BF36] disabled:opacity-40 text-[#0F2600] text-xs font-bold shadow-xs transition-all cursor-pointer"
+                      >
+                        {t('settings.saveKey', 'Save API Key')}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleTestConnection}
+                        disabled={testingKey || (!apiKeyInput.trim() && !draftPrefs.geminiApiKey)}
+                        className="px-3.5 py-2 rounded-xl bg-white dark:bg-[#263722] hover:bg-[#E2F2D9] dark:hover:bg-[#2E4229] disabled:opacity-40 text-[#3B4E37] dark:text-[#B6CCB0] text-xs font-bold border border-[#DCEAD4] dark:border-[#33482E] transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        {testingKey ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                        <span>{t('settings.testKey', 'Test Connection')}</span>
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Helper Link */}
+                  <div className="flex items-center justify-between text-[11px] pt-0.5">
+                    <span className="text-[#485B44] dark:text-[#9EB598]">
+                      {isDraftFa ? 'ذخیره‌شده محلی در مرورگر' : 'Stored locally in your browser'}
                     </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1E4300] dark:text-[#80D141]">
-                      {isDraftFa ? 'بدون نیاز به تنظیمات' : 'Ready to use'}
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[#3B7E10] dark:text-[#80D141] hover:underline font-bold flex items-center gap-1"
+                    >
+                      <span>{isDraftFa ? 'دریافت کلید رایگان Google AI Studio' : 'Get free key from Google AI Studio'}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-1.5">
+                      <Key className="w-3.5 h-3.5 text-[#80D141]" />
+                      <span>{t('settings.openRouterApiKey', 'OpenRouter API Key')}</span>
+                    </label>
+
+                    {(draftPrefs.openRouterApiKey || openRouterKeyInput) && (
+                      <button
+                        type="button"
+                        onClick={handleClearKey}
+                        className="text-[11px] text-[#B3261E] dark:text-[#F2B8B5] hover:underline font-medium cursor-pointer"
+                      >
+                        {isDraftFa ? 'پاک کردن کلید' : 'Clear key'}
+                      </button>
+                    )}
+                  </div>
+
+                  <form onSubmit={handleSaveCustomKey} className="space-y-3">
+                    <div className="relative flex items-center">
+                      <input
+                        type={showKey ? 'text' : 'password'}
+                        value={openRouterKeyInput}
+                        onChange={(e) => setOpenRouterKeyInput(e.target.value)}
+                        placeholder={isDraftFa ? 'کلید OpenRouter خود (sk-or-v1-...) را وارد کنید' : 'Paste your OpenRouter key (sk-or-v1-...)'}
+                        className="w-full pl-3.5 pr-20 py-2.5 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs font-mono text-[#151E14] dark:text-[#E8F2E4] placeholder:font-sans placeholder:text-[#79747E] dark:placeholder:text-[#8D9E8A] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowKey(!showKey)}
+                        className="absolute right-2.5 p-1 rounded-lg text-[#79747E] hover:text-[#151E14] dark:hover:text-[#E8F2E4] transition-colors cursor-pointer"
+                        title={showKey ? 'Hide key' : 'Show key'}
+                      >
+                        {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+
+                    {/* OpenRouter Model Text Field */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between flex-wrap gap-1.5">
+                        <label className="text-[11px] font-bold text-[#151E14] dark:text-[#E8F2E4] block">
+                          {t('settings.openRouterModel', 'OpenRouter Model')}
+                        </label>
+                        <a
+                          href="https://openrouter.ai/models?variant=free&output_modalities=text"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[11px] text-[#3B7E10] dark:text-[#80D141] hover:underline font-bold inline-flex items-center gap-1"
+                        >
+                          <span>{t('settings.openRouterFreeModelsLink', 'Browse Free Text Models')}</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                      <input
+                        type="text"
+                        value={openRouterModelInput}
+                        onChange={(e) => setOpenRouterModelInput(e.target.value)}
+                        placeholder="google/gemini-2.5-flash"
+                        className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs font-mono text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+                      />
+                      <p className="text-[10.5px] text-[#485B44] dark:text-[#9EB598]">
+                        {t('settings.openRouterFreeModelsHint', 'OpenRouter offers free models ending with :free (e.g., google/gemini-2.5-flash:free)')}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="submit"
+                        disabled={
+                          !openRouterKeyInput.trim() ||
+                          (openRouterKeyInput === (draftPrefs.openRouterApiKey || '') &&
+                            openRouterModelInput === (draftPrefs.openRouterModel || DEFAULT_OPENROUTER_MODEL))
+                        }
+                        className="px-4 py-2 rounded-xl bg-[#80D141] hover:bg-[#72BF36] disabled:opacity-40 text-[#0F2600] text-xs font-bold shadow-xs transition-all cursor-pointer"
+                      >
+                        {t('settings.saveKey', 'Save API Key')}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleTestConnection}
+                        disabled={testingKey || (!openRouterKeyInput.trim() && !draftPrefs.openRouterApiKey)}
+                        className="px-3.5 py-2 rounded-xl bg-white dark:bg-[#263722] hover:bg-[#E2F2D9] dark:hover:bg-[#2E4229] disabled:opacity-40 text-[#3B4E37] dark:text-[#B6CCB0] text-xs font-bold border border-[#DCEAD4] dark:border-[#33482E] transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        {testingKey ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                        <span>{t('settings.testKey', 'Test Connection')}</span>
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Helper Link */}
+                  <div className="flex items-center justify-between text-[11px] pt-0.5">
+                    <span className="text-[#485B44] dark:text-[#9EB598]">
+                      {isDraftFa ? 'ذخیره‌شده محلی در مرورگر' : 'Stored locally in your browser'}
                     </span>
+                    <a
+                      href="https://openrouter.ai/keys"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[#3B7E10] dark:text-[#80D141] hover:underline font-bold flex items-center gap-1"
+                    >
+                      <span>{isDraftFa ? 'دریافت کلید از OpenRouter.ai' : 'Get API key from OpenRouter.ai'}</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
                   </div>
-                  <p className="text-[11px] text-[#485B44] dark:text-[#9EB598]">
-                    {isDraftFa 
-                      ? 'همراه با کلید از پیش تنظیم‌شده سرور برای تولید فوری برنامه.'
-                      : 'Built-in Gemini API key for instant smart schedule synthesis.'}
-                  </p>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={handleUseSharedKey}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                    draftPrefs.useSharedFreeKey && !draftPrefs.geminiApiKey
-                      ? 'bg-[#80D141] text-[#0F2600] shadow-xs'
-                      : 'bg-white dark:bg-[#263722] text-[#485B44] dark:text-[#9EB598] hover:text-[#151E14] dark:hover:text-[#E8F2E4] border border-[#DCEAD4] dark:border-[#33482E]'
-                  }`}
-                >
-                  {draftPrefs.useSharedFreeKey && !draftPrefs.geminiApiKey
-                    ? (isDraftFa ? '✓ فعال' : '✓ Active')
-                    : (isDraftFa ? 'استفاده' : 'Use Free Key')}
-                </button>
-              </div>
-
-              {/* Custom Key Accordion / Form */}
-              <div className="pt-3 border-t border-[#DCEAD4] dark:border-[#2A3E26] space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-1.5">
-                    <Key className="w-3.5 h-3.5 text-[#80D141]" />
-                    <span>{t('settings.customApiKey', 'Personal Gemini API Key')}</span>
-                  </label>
-
-                  {(draftPrefs.geminiApiKey || apiKeyInput) && (
-                    <button
-                      type="button"
-                      onClick={handleClearKey}
-                      className="text-[11px] text-[#B3261E] dark:text-[#F2B8B5] hover:underline font-medium cursor-pointer"
-                    >
-                      {isDraftFa ? 'پاک کردن کلید' : 'Clear key'}
-                    </button>
-                  )}
-                </div>
-
-                <form onSubmit={handleSaveCustomKey} className="space-y-2">
-                  <div className="relative flex items-center">
-                    <input
-                      type={showKey ? 'text' : 'password'}
-                      value={apiKeyInput}
-                      onChange={(e) => setApiKeyInput(e.target.value)}
-                      placeholder={isDraftFa ? 'کلید اختصاصی خود (AIzaSy...) را وارد کنید' : 'Paste your API key (AIzaSy...)'}
-                      className="w-full pl-3.5 pr-20 py-2.5 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs font-mono text-[#151E14] dark:text-[#E8F2E4] placeholder:font-sans placeholder:text-[#79747E] dark:placeholder:text-[#8D9E8A] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowKey(!showKey)}
-                      className="absolute right-2.5 p-1 rounded-lg text-[#79747E] hover:text-[#151E14] dark:hover:text-[#E8F2E4] transition-colors cursor-pointer"
-                      title={showKey ? 'Hide key' : 'Show key'}
-                    >
-                      {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="submit"
-                      disabled={!apiKeyInput.trim() || apiKeyInput === (draftPrefs.geminiApiKey || '')}
-                      className="px-4 py-2 rounded-xl bg-[#80D141] hover:bg-[#72BF36] disabled:opacity-40 text-[#0F2600] text-xs font-bold shadow-xs transition-all cursor-pointer"
-                    >
-                      {t('settings.saveKey', 'Save API Key')}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleTestConnection}
-                      disabled={testingKey || (!apiKeyInput.trim() && !draftPrefs.geminiApiKey)}
-                      className="px-3.5 py-2 rounded-xl bg-white dark:bg-[#263722] hover:bg-[#E2F2D9] dark:hover:bg-[#2E4229] disabled:opacity-40 text-[#3B4E37] dark:text-[#B6CCB0] text-xs font-bold border border-[#DCEAD4] dark:border-[#33482E] transition-all flex items-center gap-1.5 cursor-pointer"
-                    >
-                      {testingKey ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
-                      <span>{t('settings.testKey', 'Test Connection')}</span>
-                    </button>
-                  </div>
-                </form>
-
-                {/* Helper Link */}
-                <div className="flex items-center justify-between text-[11px] pt-0.5">
-                  <span className="text-[#485B44] dark:text-[#9EB598]">
-                    {isDraftFa ? 'ذخیره‌شده محلی در مرورگر' : 'Stored locally in your browser'}
-                  </span>
-                  <a
-                    href="https://aistudio.google.com/app/apikey"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[#3B7E10] dark:text-[#80D141] hover:underline font-bold flex items-center gap-1"
-                  >
-                    <span>{isDraftFa ? 'دریافت کلید رایگان Google AI Studio' : 'Get free key from Google AI Studio'}</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Notification & Test Result Feedback Banners */}
@@ -703,6 +1008,231 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Interactive API Key Tester & Single-Turn Query Playground */}
+            <div id="section-api-test-playground" className="p-4 sm:p-5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] space-y-3.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-[#E8F8D8] dark:bg-[#20361C] border border-[#80D141]/50 flex items-center justify-center text-[#234A00] dark:text-[#80D141] shrink-0">
+                    <Terminal className="w-4 h-4 stroke-[2.5]" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-bold text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-2 flex-wrap">
+                      <span>{t('settings.testPlaygroundTitle', 'API Key Tester & Query Playground')}</span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#E8F8D8] dark:bg-[#23351F] text-[#2C5214] dark:text-[#9DD86A] border border-[#80D141]/40">
+                        {selectedProvider === 'openrouter' ? `OpenRouter · ${openRouterModelInput || DEFAULT_OPENROUTER_MODEL}` : `Gemini · ${geminiModelInput || DEFAULT_GEMINI_MODEL}`}
+                      </span>
+                    </h4>
+                    <p className="text-[11px] text-[#485B44] dark:text-[#9EB598] mt-0.5 flex items-center justify-between flex-wrap gap-2">
+                      <span>{t('settings.testPlaygroundDesc', 'Send a single-turn prompt to verify your API key and chosen model respond accurately in real time.')}</span>
+                      {selectedProvider === 'openrouter' && (
+                        <a
+                          href="https://openrouter.ai/models?variant=free&output_modalities=text"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[#3B7E10] dark:text-[#80D141] hover:underline font-bold inline-flex items-center gap-1 text-[11px]"
+                        >
+                          <span>{t('settings.openRouterFreeModelsLink', 'Browse Free Text Models')}</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Sample Prompts */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-[#485B44] dark:text-[#9EB598]">
+                  {t('settings.samplePrompts', 'Quick Examples')}
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const q = t('settings.samplePrompt1', "What's your name and model version?");
+                      setTestPromptInput(q);
+                      handleSendTestPrompt(q);
+                    }}
+                    disabled={testingPrompt}
+                    className="px-2.5 py-1 rounded-xl text-[11px] font-medium bg-white dark:bg-[#243321] hover:bg-[#E8F8D8] dark:hover:bg-[#2C4028] text-[#3B4E37] dark:text-[#C5DDC0] border border-[#DCEAD4] dark:border-[#30442B] transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    🤖 {t('settings.samplePrompt1', "What's your name and model version?")}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const q = t('settings.samplePrompt2', 'Give 1 micro-step to start when overwhelmed (under 15 words).');
+                      setTestPromptInput(q);
+                      handleSendTestPrompt(q);
+                    }}
+                    disabled={testingPrompt}
+                    className="px-2.5 py-1 rounded-xl text-[11px] font-medium bg-white dark:bg-[#243321] hover:bg-[#E8F8D8] dark:hover:bg-[#2C4028] text-[#3B4E37] dark:text-[#C5DDC0] border border-[#DCEAD4] dark:border-[#30442B] transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    🎯 {t('settings.samplePrompt2', 'Give 1 micro-step to start when overwhelmed (under 15 words).')}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const q = t('settings.samplePrompt3', 'Give 1 practical tip to break task paralysis (under 15 words).');
+                      setTestPromptInput(q);
+                      handleSendTestPrompt(q);
+                    }}
+                    disabled={testingPrompt}
+                    className="px-2.5 py-1 rounded-xl text-[11px] font-medium bg-white dark:bg-[#243321] hover:bg-[#E8F8D8] dark:hover:bg-[#2C4028] text-[#3B4E37] dark:text-[#C5DDC0] border border-[#DCEAD4] dark:border-[#30442B] transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    🧠 {t('settings.samplePrompt3', 'Give 1 practical tip to break task paralysis (under 15 words).')}
+                  </button>
+                </div>
+              </div>
+
+              {/* Prompt Input & Send */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendTestPrompt();
+                }}
+                className="space-y-2"
+              >
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={testPromptInput}
+                    onChange={(e) => setTestPromptInput(e.target.value)}
+                    placeholder={t('settings.testPromptPlaceholder', 'Type a prompt to test your API key (e.g., What is your model name?)...')}
+                    className="flex-1 px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs text-[#151E14] dark:text-[#E8F2E4] placeholder:text-[#79747E] dark:placeholder:text-[#8D9E8A] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={testingPrompt || !testPromptInput.trim()}
+                    className="px-4 py-2.5 rounded-xl bg-[#80D141] hover:bg-[#72BF36] disabled:opacity-40 text-[#0F2600] text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                  >
+                    {testingPrompt ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>{t('settings.testingPrompt', 'Sending Query...')}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5 stroke-[2.5] rtl:rotate-180" />
+                        <span>{t('settings.sendTestPrompt', 'Send Test Query')}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+
+              {/* Model Response Container */}
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between text-xs font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                  <span className="flex items-center gap-1.5">
+                    <MessageSquare className="w-3.5 h-3.5 text-[#80D141]" />
+                    <span>{t('settings.testResponseLabel', 'Model Response')}</span>
+                  </span>
+
+                  {promptTestResult && (
+                    <div className="flex items-center gap-2">
+                      {promptTestResult.latencyMs > 0 && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[#EDF6E8] dark:bg-[#20311D] text-[#3B4E37] dark:text-[#A7C59E] border border-[#D8E8D0] dark:border-[#2B4026] flex items-center gap-1">
+                          <Zap className="w-3 h-3 text-amber-500" />
+                          <span>{promptTestResult.latencyMs}ms</span>
+                        </span>
+                      )}
+
+                      {promptTestResult.response && (
+                        <button
+                          type="button"
+                          onClick={handleCopyTestResponse}
+                          className="text-[11px] font-medium text-[#3B4E37] dark:text-[#B6CCB0] hover:text-[#151E14] dark:hover:text-[#E8F2E4] flex items-center gap-1 cursor-pointer"
+                        >
+                          {copiedResponse ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                              <span className="text-emerald-600 dark:text-emerald-400 font-bold">{t('settings.copiedResponse', 'Copied!')}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>{t('settings.copyResponse', 'Copy')}</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPromptTestResult(null);
+                          setTestPromptInput('');
+                        }}
+                        className="text-[11px] text-[#79747E] hover:text-[#B3261E] dark:hover:text-[#F2B8B5] transition-colors cursor-pointer"
+                      >
+                        {t('settings.clearResponse', 'Clear')}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Output Box */}
+                <div
+                  id="api-test-output-box"
+                  className={`p-3.5 rounded-xl border text-xs leading-relaxed transition-all min-h-[72px] flex flex-col justify-center ${
+                    testingPrompt
+                      ? 'bg-white dark:bg-[#202E1D] border-[#80D141]/50 text-[#485B44] dark:text-[#9EB598] animate-pulse'
+                      : promptTestResult?.success
+                      ? 'bg-white dark:bg-[#1E2D1B] border-[#80D141]/50 text-[#151E14] dark:text-[#E8F2E4] shadow-2xs'
+                      : promptTestResult?.error
+                      ? 'bg-red-50/70 dark:bg-red-950/40 border-red-200 dark:border-red-900/50 text-red-900 dark:text-red-300'
+                      : 'bg-white/60 dark:bg-[#202E1D]/50 border-dashed border-[#DCEAD4] dark:border-[#2C3E27] text-[#79747E] dark:text-[#8D9E8A]'
+                  }`}
+                >
+                  {testingPrompt ? (
+                    <div className="flex items-center gap-2 text-xs font-medium text-[#3B4E37] dark:text-[#A7C59E]">
+                      <Loader2 className="w-4 h-4 animate-spin text-[#80D141]" />
+                      <span>
+                        {isDraftFa
+                          ? `در حال ارسال پرسش به ${selectedProvider === 'openrouter' ? 'OpenRouter' : 'Google Gemini'}...`
+                          : `Querying ${selectedProvider === 'openrouter' ? 'OpenRouter' : 'Google Gemini'} (${selectedProvider === 'openrouter' ? (openRouterModelInput || DEFAULT_OPENROUTER_MODEL) : (geminiModelInput || DEFAULT_GEMINI_MODEL)})...`}
+                      </span>
+                    </div>
+                  ) : promptTestResult?.success ? (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>{promptTestResult.model}</span>
+                        <span className="text-[#79747E] dark:text-[#8D9E8A] font-normal">({promptTestResult.timestamp})</span>
+                      </div>
+                      <div className="whitespace-pre-wrap font-sans text-xs text-[#151E14] dark:text-[#E8F2E4] selection:bg-[#80D141]/30">
+                        {promptTestResult.response}
+                      </div>
+                    </div>
+                  ) : promptTestResult?.error ? (
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-red-700 dark:text-red-400">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        <span>{isDraftFa ? 'خطا در اجرای پرسش' : 'Query Failed'}</span>
+                      </div>
+                      <p className="text-xs text-red-800 dark:text-red-300">
+                        {promptTestResult.error}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-[#79747E] dark:text-[#8D9E8A] italic">
+                      {t('settings.noResponseYet', 'Type a prompt above or pick a quick example to test your API key response.')}
+                    </div>
+                  )}
+                </div>
+
+                {/* Single-turn isolation hint */}
+                <div className="text-[10px] text-[#556950] dark:text-[#8DA589] flex items-center gap-1.5 pt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#80D141] shrink-0" />
+                  <span>{t('settings.isolatedContextHint', 'All queries are completely independent single-turn calls (zero conversation context or history retained).')}</span>
+                </div>
+              </div>
+            </div>
           </section>
 
           {/* Smart Planner Custom Instructions Section */}
@@ -1096,6 +1626,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                 type="button"
                 onClick={() => {
                   setDraftPrefs((prev) => ({ ...prev, theme: 'dark' }));
+                  onUpdatePrefs({ theme: 'dark' });
                   soundEngine.playPop();
                 }}
                 className={`py-3 px-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border transition-all cursor-pointer ${
@@ -1112,6 +1643,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                 type="button"
                 onClick={() => {
                   setDraftPrefs((prev) => ({ ...prev, theme: 'light' }));
+                  onUpdatePrefs({ theme: 'light' });
                   soundEngine.playPop();
                 }}
                 className={`py-3 px-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border transition-all cursor-pointer ${

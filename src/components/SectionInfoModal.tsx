@@ -202,7 +202,7 @@ export const SectionInfoModal: React.FC<SectionInfoModalProps> = ({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.92, y: 12 }}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xl max-h-[88vh] flex flex-col rounded-[28px] bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl overflow-hidden"
+        className="w-full max-w-xl max-h-[88vh] flex flex-col rounded-[28px] bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl overflow-hidden"
       >
         {/* Modal Header */}
         <div className="p-5 pb-3 border-b border-[#DCEAD4] dark:border-[#263722] flex items-center justify-between shrink-0">
@@ -297,7 +297,7 @@ export const SectionInfoModal: React.FC<SectionInfoModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 px-5 border-t border-[#DCEAD4] dark:border-[#263722] flex items-center justify-between shrink-0 bg-[#F8FAF5] dark:bg-[#182316]">
+        <div className="p-4 px-5 border-t border-[#DCEAD4] dark:border-[#263722] flex items-center justify-between shrink-0 bg-white dark:bg-[#182316]">
           <div className="text-[11px] text-[#485B44] dark:text-[#9EB598] font-medium flex items-center gap-1">
             <span>💡 Click any tab above to switch guides</span>
           </div>

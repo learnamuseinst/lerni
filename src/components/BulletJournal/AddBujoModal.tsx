@@ -34,7 +34,6 @@ const TYPE_SYMBOLS: Record<BujoType, { symbol: string; typeKey: string; descKey:
   task: { symbol: '⬜', typeKey: 'journal.typeTask', descKey: 'journal.typeTaskDesc' },
   event: { symbol: '⏳', typeKey: 'journal.typeEvent', descKey: 'journal.typeEventDesc' },
   note: { symbol: '✒️', typeKey: 'journal.typeNote', descKey: 'journal.typeNoteDesc' },
-  habit_seed: { symbol: '🌱', typeKey: 'journal.typeHabitSeed', descKey: 'journal.typeHabitSeedDesc' },
 };
 
 export const AddBujoModal: React.FC<AddBujoModalProps> = ({
@@ -207,7 +206,7 @@ export const AddBujoModal: React.FC<AddBujoModalProps> = ({
           <label className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4]">
             {t('journal.entryType')}
           </label>
-          <div className="grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-3 gap-2">
             {(Object.keys(TYPE_SYMBOLS) as BujoType[]).map((tKey) => {
               const item = TYPE_SYMBOLS[tKey];
               const isSelected = type === tKey;

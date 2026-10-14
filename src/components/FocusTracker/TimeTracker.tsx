@@ -631,7 +631,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({ setIsRunningToNav }) =
     <div className="w-full space-y-6">
       
       {/* 1. Hero Stopwatch Card */}
-      <div className="p-6 sm:p-8 rounded-[28px] bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-xs relative overflow-hidden">
+      <div className="p-6 sm:p-8 rounded-[28px] bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-xs relative overflow-hidden">
         
         {/* Ambient subtle glow when timer is running */}
         {isRunning && (
@@ -800,7 +800,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({ setIsRunningToNav }) =
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         
         {/* Tracked Today */}
-        <div className="p-4 rounded-2xl bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] flex items-center gap-3">
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1C3700] dark:text-[#80D141] flex items-center justify-center font-bold">
             <Clock className="w-5 h-5" />
           </div>
@@ -815,7 +815,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({ setIsRunningToNav }) =
         </div>
 
         {/* Tracked This Week */}
-        <div className="p-4 rounded-2xl bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] flex items-center gap-3">
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-[#E0E7FF] dark:bg-[#1E1B4B] text-[#3B82F6] dark:text-[#93C5FD] flex items-center justify-center font-bold">
             <Calendar className="w-5 h-5" />
           </div>
@@ -830,7 +830,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({ setIsRunningToNav }) =
         </div>
 
         {/* Active Projects Count */}
-        <div className="p-4 rounded-2xl bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] flex items-center gap-3">
+        <div className="p-4 rounded-2xl bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-[#FCE7F3] dark:bg-[#500724] text-[#EC4899] dark:text-[#F472B6] flex items-center justify-center font-bold">
             <Layers className="w-5 h-5" />
           </div>
@@ -847,7 +847,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({ setIsRunningToNav }) =
       </div>
 
       {/* 3. Time Breakdown & History Section */}
-      <div className="p-5 sm:p-6 rounded-[28px] bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] space-y-5">
+      <div className="p-5 sm:p-6 rounded-[28px] bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] space-y-5">
         
         {/* Header & Filter Controls */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -1068,7 +1068,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({ setIsRunningToNav }) =
             return (
               <div
                 key={proj.id}
-                className="p-5 rounded-[24px] bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] space-y-4 flex flex-col justify-between"
+                className="p-5 rounded-[24px] bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] space-y-4 flex flex-col justify-between"
               >
                 {/* Project Header */}
                 <div className="flex items-start justify-between gap-3">
@@ -1537,7 +1537,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({ setIsRunningToNav }) =
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md p-6 rounded-[28px] bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl space-y-4"
+              className="w-full max-w-md p-6 rounded-[28px] bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl space-y-4"
             >
               <div className="flex items-center justify-between">
                 <h3 className="font-display text-lg font-bold text-[#151E14] dark:text-[#E8F2E4]">
@@ -1664,7 +1664,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({ setIsRunningToNav }) =
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md p-6 rounded-[28px] bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl space-y-4"
+              className="w-full max-w-md p-6 rounded-[28px] bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl space-y-4"
             >
               <div className="flex items-center justify-between">
                 <h3 className="font-display text-lg font-bold text-[#151E14] dark:text-[#E8F2E4]">
@@ -1766,7 +1766,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({ setIsRunningToNav }) =
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md p-6 rounded-[28px] bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl space-y-4"
+              className="w-full max-w-md p-6 rounded-[28px] bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl space-y-4"
             >
               <div className="flex items-start gap-3.5">
                 <div className="w-11 h-11 rounded-2xl bg-[#FEE2E2] dark:bg-[#451A1A] text-[#EF4444] flex items-center justify-center shrink-0">
@@ -1840,7 +1840,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({ setIsRunningToNav }) =
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md p-6 rounded-[28px] bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl space-y-4"
+              className="w-full max-w-md p-6 rounded-[28px] bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] shadow-2xl space-y-4"
             >
               <div className="flex items-start gap-3.5">
                 <div className="w-11 h-11 rounded-2xl bg-[#FEE2E2] dark:bg-[#451A1A] text-[#EF4444] flex items-center justify-center shrink-0">

@@ -19,7 +19,8 @@ import {
   X,
   ChevronDown,
   Clock,
-  Filter
+  Filter,
+  AlertCircle
 } from 'lucide-react';
 import { BrainDumpItem, EnergyLevel, ENERGY_LEVELS, BujoEntry, Habit } from '../../types';
 import { LerniMascot } from '../Mascot/LerniMascot';
@@ -36,6 +37,7 @@ interface BrainDumpProps {
   currentEnergy?: EnergyLevel;
   categories?: string[];
   onOpenSettings?: () => void;
+  hasApiKey?: boolean;
 }
 
 export const BrainDump: React.FC<BrainDumpProps> = ({
@@ -46,6 +48,7 @@ export const BrainDump: React.FC<BrainDumpProps> = ({
   currentEnergy = 'medium',
   categories,
   onOpenSettings,
+  hasApiKey = false,
 }) => {
   const { t, language } = useI18n();
   const [inputText, setInputText] = useState('');
@@ -97,6 +100,7 @@ export const BrainDump: React.FC<BrainDumpProps> = ({
   // AI Tidy Up state
   const [isTidying, setIsTidying] = useState(false);
   const [tidyResult, setTidyResult] = useState<{ summary?: string; items: any[] } | null>(null);
+  const [missingKeyError, setMissingKeyError] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -234,6 +238,15 @@ export const BrainDump: React.FC<BrainDumpProps> = ({
 
   // Local Tidy Up (Fast & Offline)
   const handleAITidyUp = () => {
+    if (!hasApiKey) {
+      soundEngine.playPop();
+      setMissingKeyError(
+        t('planner.noApiKeyError', 'Please add your API key in Settings to generate AI-powered features.')
+      );
+      return;
+    }
+
+    setMissingKeyError(null);
     const unprocessed = items.filter((i) => !i.isProcessed);
 
     if (unprocessed.length === 0) {
@@ -491,7 +504,7 @@ export const BrainDump: React.FC<BrainDumpProps> = ({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.94, y: 15 }}
               transition={{ type: 'spring', damping: 28, stiffness: 350 }}
-              className="bg-[#F8FAF5] dark:bg-[#182316] rounded-[28px] p-5 sm:p-6 border border-[#DCEAD4] dark:border-[#263722] shadow-2xl w-full max-w-xl space-y-4"
+              className="bg-white dark:bg-[#182316] rounded-[28px] p-5 sm:p-6 border border-[#DCEAD4] dark:border-[#263722] shadow-2xl w-full max-w-xl space-y-4"
               role="dialog"
               aria-modal="true"
               aria-labelledby="add-thought-title"
@@ -603,6 +616,42 @@ export const BrainDump: React.FC<BrainDumpProps> = ({
         )}
       </AnimatePresence>
 
+      {/* Missing API Key Banner */}
+      <AnimatePresence>
+        {missingKeyError && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800/60 text-xs text-amber-900 dark:text-amber-200 flex items-center justify-between gap-3 shadow-xs"
+          >
+            <div className="flex items-start gap-2.5 flex-1">
+              <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+              <div className="flex-1 leading-relaxed">
+                <span className="font-medium">{missingKeyError}</span>
+                {onOpenSettings && (
+                  <button
+                    type="button"
+                    onClick={onOpenSettings}
+                    className="mx-2 font-bold underline text-[#3B7E10] dark:text-[#80D141] hover:opacity-80 transition-opacity cursor-pointer"
+                  >
+                    {t('planner.openSettingsLink', 'Go to Settings')}
+                  </button>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMissingKeyError(null)}
+              className="p-1 rounded-full hover:bg-amber-200/50 dark:hover:bg-amber-900/50 text-amber-700 dark:text-amber-300 transition-colors shrink-0 cursor-pointer"
+              aria-label={t('common.close', 'Close')}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* AI Tidy Results Review Dialog if active */}
       <AnimatePresence>
         {tidyResult && (
@@ -610,7 +659,7 @@ export const BrainDump: React.FC<BrainDumpProps> = ({
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 15 }}
-            className="bg-[#F8FAF5] dark:bg-[#182316] rounded-[28px] p-6 border-2 border-[#80D141] shadow-xl space-y-4"
+            className="bg-white dark:bg-[#182316] rounded-[28px] p-6 border-2 border-[#80D141] shadow-xl space-y-4"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -687,7 +736,7 @@ export const BrainDump: React.FC<BrainDumpProps> = ({
 
       {/* Thoughts List */}
       {filteredItems.length === 0 ? (
-        <div id="braindump-empty-state" className="text-center py-12 px-4 rounded-[28px] bg-[#F8FAF5]/50 dark:bg-[#182316]/50 border border-dashed border-[#DCEAD4] dark:border-[#263722] space-y-3">
+        <div id="braindump-empty-state" className="text-center py-12 px-4 rounded-[28px] bg-white/70 dark:bg-[#182316]/50 border border-dashed border-[#DCEAD4] dark:border-[#263722] space-y-3">
           <LerniMascot pose="zen" size="md" className="mb-2 mx-auto" />
           <h3 className="font-display text-base font-bold text-[#151E14] dark:text-[#E8F2E4] mb-1">
             {searchQuery ? t('braindump.noMatchingSearch') : (language === 'fa' ? 'ذهن شما پاک و آرام است!' : 'Your mind is clear!')}
@@ -732,8 +781,8 @@ export const BrainDump: React.FC<BrainDumpProps> = ({
                     isProcessed
                       ? 'bg-[#E1F6D0] dark:bg-[#1B3618] border-[#72C833] dark:border-[#529E25] shadow-xs'
                       : isPinned
-                      ? 'bg-[#F8FAF5] dark:bg-[#1C281A] border-2 border-[#80D141] shadow-sm'
-                      : 'bg-[#F8FAF5] dark:bg-[#182316] border-[#DCEAD4] dark:border-[#263722] hover:border-[#80D141]/60 shadow-xs'
+                      ? 'bg-white dark:bg-[#1C281A] border-2 border-[#80D141] shadow-xs'
+                      : 'bg-white dark:bg-[#182316] border-[#DCEAD4] dark:border-[#263722] hover:border-[#80D141]/60 shadow-2xs'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2.5 sm:gap-3">

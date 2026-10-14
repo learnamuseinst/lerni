@@ -47,13 +47,13 @@ interface BulletJournalProps {
   currentEnergy: EnergyLevel;
   categories?: string[];
   onOpenSettings?: () => void;
+  hasApiKey?: boolean;
 }
 
 const TYPE_SYMBOLS: Record<BujoType, { symbol: string; label: string; icon: React.ReactNode }> = {
   task: { symbol: '⬜', label: 'Task (To-Do)', icon: <span className="text-xs">⬜</span> },
   event: { symbol: '⏳', label: 'Event', icon: <span className="text-xs">⏳</span> },
   note: { symbol: '✒️', label: 'Note / Reflection', icon: <span className="text-xs">✒️</span> },
-  habit_seed: { symbol: '🌱', label: 'Habit Idea', icon: <span className="text-xs">🌱</span> },
 };
 
 export const BulletJournal: React.FC<BulletJournalProps> = ({
@@ -63,6 +63,7 @@ export const BulletJournal: React.FC<BulletJournalProps> = ({
   currentEnergy,
   categories,
   onOpenSettings,
+  hasApiKey = false,
 }) => {
   const { t, language } = useI18n();
   const todayStr = getTodayKey();
@@ -219,7 +220,7 @@ export const BulletJournal: React.FC<BulletJournalProps> = ({
     <div className="w-full max-w-5xl mx-auto px-4 pb-24 space-y-6">
       
       {/* Expandable Journal Navigation & Filters Top Panel */}
-      <div className="bg-[#F8FAF5] dark:bg-[#182316] p-4 sm:p-5 rounded-[28px] border border-[#DCEAD4] dark:border-[#263722] shadow-xs space-y-3">
+      <div className="bg-white dark:bg-[#182316] p-4 sm:p-5 rounded-[28px] border border-[#DCEAD4] dark:border-[#263722] shadow-xs space-y-3">
         {/* Header Summary Row & Expand Toggle */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button
@@ -499,7 +500,7 @@ export const BulletJournal: React.FC<BulletJournalProps> = ({
         /* Timeline / All Dates Grouped View */
         <div className="space-y-6">
           {sortedDates.length === 0 ? (
-            <div className="p-8 rounded-[28px] bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] text-center space-y-2">
+            <div className="p-8 rounded-[28px] bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] text-center space-y-2">
               <span className="text-3xl">🌱</span>
               <h4 className="font-display font-bold text-sm text-[#151E14] dark:text-[#E8F2E4]">
                 {t('journal.noEntriesTimelineTitle')}
@@ -540,7 +541,7 @@ export const BulletJournal: React.FC<BulletJournalProps> = ({
         /* Day / Selected Date View */
         <div className="space-y-2.5">
           {filteredEntries.length === 0 ? (
-            <div className="p-8 rounded-[28px] bg-[#F8FAF5] dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] text-center space-y-3">
+            <div className="p-8 rounded-[28px] bg-white dark:bg-[#182316] border border-[#DCEAD4] dark:border-[#263722] text-center space-y-3">
               <span className="text-3xl">🌱</span>
               <h4 className="font-display font-bold text-sm text-[#151E14] dark:text-[#E8F2E4]">
                 {t('journal.noEntriesDayTitle')} {formatDateDisplay(selectedDate, { showDayOfWeek: true, includeYear: false, lang: language })}
@@ -599,6 +600,8 @@ export const BulletJournal: React.FC<BulletJournalProps> = ({
         }}
         onSendToFocusTimer={onSendToFocusTimer}
         currentEnergy={currentEnergy}
+        hasApiKey={hasApiKey}
+        onOpenSettings={onOpenSettings}
       />
 
     </div>
