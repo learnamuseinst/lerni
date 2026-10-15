@@ -633,6 +633,70 @@ export const storage = {
       console.error("Failed import:", e);
       return false;
     }
+  },
+
+  cleanAllPredefinedData: () => {
+    storage.saveHabits([]);
+    storage.saveBujoEntries([]);
+    storage.saveBrainDumpItems([]);
+    storage.saveFocusSessions([]);
+    storage.saveProjects([]);
+    storage.saveProjectTasks([]);
+    storage.saveTimeLogs([]);
+    storage.saveActiveTimeTracker(null);
+    try {
+      localStorage.setItem(STORAGE_KEYS.PLANS, JSON.stringify({}));
+      localStorage.removeItem('kinetic_habits_v1');
+      localStorage.removeItem('kinetic_bujo_v1');
+      localStorage.removeItem('kinetic_focus_v1');
+      localStorage.removeItem('kinetic_prefs_v1');
+    } catch (e) {
+      console.error("Failed to clean predefined data:", e);
+    }
+  },
+
+  resetToDemoData: () => {
+    const freshHabits: Habit[] = DEFAULT_HABITS.map((h, i) => ({
+      ...h,
+      createdAt: getPastDateString(10 - i * 2),
+      completedDates: [getPastDateString(2), getPastDateString(1)],
+    }));
+
+    const freshBujo: BujoEntry[] = DEFAULT_BUJO.map((b, i) => ({
+      ...b,
+      date: getTodayDateString(),
+      createdAt: Date.now() - 3600000 * (4 - i),
+    }));
+
+    const freshBrainDump: BrainDumpItem[] = DEFAULT_BRAIN_DUMP.map((bd, i) => ({
+      ...bd,
+      createdAt: Date.now() - 1800000 * (4 - i),
+    }));
+
+    const freshFocusSessions: FocusSession[] = DEFAULT_FOCUS_SESSIONS.map((fs, i) => ({
+      ...fs,
+      date: getPastDateString(i + 1),
+      timestamp: Date.now() - 86400000 * (i + 1),
+    }));
+
+    storage.saveHabits(freshHabits);
+    storage.saveBujoEntries(freshBujo);
+    storage.saveBrainDumpItems(freshBrainDump);
+    storage.saveFocusSessions(freshFocusSessions);
+    storage.saveProjects(DEFAULT_PROJECTS);
+    storage.saveProjectTasks(DEFAULT_PROJECT_TASKS);
+    storage.saveTimeLogs(DEFAULT_TIME_LOGS);
+    storage.saveActiveTimeTracker(null);
+
+    try {
+      localStorage.setItem(STORAGE_KEYS.PLANS, JSON.stringify({}));
+      localStorage.removeItem('kinetic_habits_v1');
+      localStorage.removeItem('kinetic_bujo_v1');
+      localStorage.removeItem('kinetic_focus_v1');
+      localStorage.removeItem('kinetic_prefs_v1');
+    } catch (e) {
+      console.error("Failed to reset demo data:", e);
+    }
   }
 };
 

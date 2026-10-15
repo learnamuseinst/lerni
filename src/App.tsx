@@ -140,12 +140,15 @@ export default function App() {
     setActiveSection('settings');
   };
 
+  const [dataVersion, setDataVersion] = useState(0);
+
   const handleReloadAllData = () => {
     setPrefs(storage.getPreferences());
     setBrainDumpItems(storage.getBrainDumpItems());
     setHabits(storage.getHabits());
     setBujoEntries(storage.getBujoEntries());
     setFocusSessions(storage.getFocusSessions());
+    setDataVersion((prev) => prev + 1);
   };
 
   const lang = prefs.language || 'en';
@@ -230,13 +233,14 @@ export default function App() {
             <AnimatePresence mode="wait">
               {activeSection === 'planner' && (
                 <motion.div
-                  key="planner"
+                  key={`planner-${dataVersion}`}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.2 }}
                 >
                   <Planner
+                    key={`planner-inner-${dataVersion}`}
                     entries={bujoEntries}
                     habits={habits}
                     focusSessions={focusSessions}
@@ -341,6 +345,7 @@ export default function App() {
               aria-hidden={activeSection !== 'focus'}
             >
               <FocusTracker
+                key={`focus-${dataVersion}`}
                 sessions={focusSessions}
                 onAddSession={handleAddFocusSession}
                 activeTaskAnchor={activeTaskAnchor}

@@ -660,19 +660,10 @@ export const Planner: React.FC<PlannerProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowConfigModal(false)}
-                  className="p-2 rounded-xl text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-[#F2F8EE] dark:hover:bg-[#1F2D1C] transition-colors sm:hidden"
+                  className="p-2 rounded-xl text-[#485B44] dark:text-[#9EB598] hover:text-[#151E14] dark:hover:text-[#E8F2E4] hover:bg-[#EAEFE6] dark:hover:bg-[#1C281A] transition-colors cursor-pointer"
                   aria-label={t('common.close', 'Close')}
                 >
                   <X className="w-5 h-5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleGenerateSchedule}
-                  disabled={isGenerating}
-                  className="hidden sm:flex px-5 py-2.5 rounded-xl bg-[#80D141] hover:bg-[#72BF36] text-[#0F2600] text-xs font-bold shadow-xs items-center gap-2 transition-all active:scale-98 disabled:opacity-50 cursor-pointer"
-                >
-                  {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  <span>{dayPlan ? t('planner.reoptimize', 'Re-optimize Schedule') : t('planner.startPlanning', 'Start Planning')}</span>
                 </button>
               </div>
             </div>

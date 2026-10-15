@@ -4,9 +4,7 @@ import {
   Dices, 
   HeartHandshake, 
   Settings,
-  X,
-  Sun,
-  Moon
+  X
 } from 'lucide-react';
 import { UserPreferences, SensoryState, EnergyLevel, ENERGY_LEVELS, ActiveSection, Chronotype } from '../types';
 import { soundEngine } from '../utils/audioSynth';
@@ -150,25 +148,6 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden sm:inline">{t('header.sensoryReset', 'Sensory Reset')}</span>
           </motion.button>
 
-          {/* Quick Theme Toggle (Gentle Light / Forest Dark) */}
-          <motion.button
-            id="btn-header-theme-toggle"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => {
-              soundEngine.playPop();
-              onUpdatePrefs({ theme: prefs.theme === 'dark' ? 'light' : 'dark' });
-            }}
-            className="p-2 sm:p-2.5 rounded-full bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] dark:hover:bg-[#283A23] text-[#3B4E37] dark:text-[#B6CCB0] hover:text-[#151E14] dark:hover:text-[#E8F2E4] border border-[#D8E8D0] dark:border-[#273722] transition-all active:scale-95 cursor-pointer"
-            title={prefs.theme === 'dark' ? t('settings.themeLight', 'Gentle Light') : t('settings.themeDark', 'Forest Dark')}
-            aria-label={prefs.theme === 'dark' ? 'Switch to Gentle Light theme' : 'Switch to Forest Dark theme'}
-          >
-            {prefs.theme === 'dark' ? (
-              <Sun className="w-4 h-4 text-[#80D141]" />
-            ) : (
-              <Moon className="w-4 h-4 text-[#2E6B0E]" />
-            )}
-          </motion.button>
 
           {/* Settings */}
           <motion.button

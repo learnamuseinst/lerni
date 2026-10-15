@@ -637,6 +637,13 @@ export const translations = {
     'settings.exportBtn': 'Export JSON',
     'settings.restoreBtn': 'Restore JSON',
     'settings.resetDemoBtn': 'Reset Demo Data',
+    'settings.cleanWorkspaceBtn': 'Clean All Predefined Tasks & Habits',
+    'settings.cleanWorkspaceDesc': 'Wipe out sample tasks, habits, and notes so you have a pristine, clean workspace ready for your own use. Your settings, API keys, and theme are preserved.',
+    'settings.cleanConfirmTitle': 'Clean All Sample Data?',
+    'settings.cleanConfirmDesc': 'This will remove all sample habits, journal entries, brain dump thoughts, and schedules. Your settings and API keys will remain untouched.',
+    'settings.cleanSuccess': 'Workspace cleaned! All sample data has been cleared and your companion is ready to start fresh.',
+    'settings.resetConfirmDesc': 'Restore sample habits, tasks, projects, and journal entries so you can explore all Lerni companion features? Your settings and API keys will remain untouched.',
+    'settings.resetSuccess': 'Demo data restored! Sample tasks, habits, and journal entries are ready to explore.',
   },
 
   fa: {
@@ -1272,6 +1279,13 @@ export const translations = {
     'settings.exportBtn': 'خروجی JSON',
     'settings.restoreBtn': 'بازیابی فایل JSON',
     'settings.resetDemoBtn': 'بازنشانی اطلاعات به حالت اولیه',
+    'settings.cleanWorkspaceBtn': 'پاک‌سازی تمام تسک‌ها و عادت‌های نمونه',
+    'settings.cleanWorkspaceDesc': 'حذف کلیه عادت‌ها، تسک‌ها و یادداشت‌های نمونه جهت داشتن محیطی کاملاً تمیز و آماده شروع. تنظیمات، کلیدهای هوش مصنوعی و قالب شما حفظ می‌شوند.',
+    'settings.cleanConfirmTitle': 'آیا تمام داده‌های نمونه پاک شوند؟',
+    'settings.cleanConfirmDesc': 'این کار تمام عادت‌ها، موارد دفترچه، ثبت فکرهای نمونه و برنامه‌ها را پاک می‌کند تا محیطی کاملاً تمیز در اختیار داشته باشید. تنظیمات و کلیدهای شما حفظ خواهند شد.',
+    'settings.cleanSuccess': 'محیط کار تمیز شد! همه موارد نمونه پاک شدند و لرنی آماده شروع با داده‌های شماست.',
+    'settings.resetConfirmDesc': 'آیا مایلید تمام عادت‌ها، تسک‌ها، پروژه‌ها و یادداشت‌های نمونه را بازیابی کنید؟ تنظیمات و کلیدهای هوش مصنوعی شما حفظ خواهند شد.',
+    'settings.resetSuccess': 'اطلاعات نمونه با موفقیت بازیابی شدند! تسک‌ها، عادت‌ها و یادداشت‌های آزمایشی آماده استفاده هستند.',
   }
 };
 

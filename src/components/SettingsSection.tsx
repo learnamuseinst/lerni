@@ -14,6 +14,7 @@ import {
   RotateCcw,
   Check,
   X,
+  Eraser,
   ArrowUp,
   ArrowDown,
   CalendarCheck,
@@ -106,6 +107,10 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [newCatInput, setNewCatInput] = useState('');
   const [catError, setCatError] = useState<string | null>(null);
+  const [showCleanConfirm, setShowCleanConfirm] = useState(false);
+  const [cleanSuccessMessage, setCleanSuccessMessage] = useState<string | null>(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetSuccessMessage, setResetSuccessMessage] = useState<string | null>(null);
 
   // AI Provider & API Key state
   const [apiKeyInput, setApiKeyInput] = useState(prefs.geminiApiKey || '');
@@ -534,16 +539,34 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     reader.readAsText(file);
   };
 
-  const handleResetData = () => {
-    const confirmPrompt = isDraftFa
-      ? 'آیا مطمئن هستید که می‌خواهید تمام اطلاعات لرنی را به حالت پیش‌فرض بازنشانی کنید؟ این عمل غیرقابل بازگشت است.'
-      : 'Reset all Lerni data back to defaults? This cannot be undone.';
-    if (window.confirm(confirmPrompt)) {
-      localStorage.clear();
-      onReloadAllData();
-      soundEngine.playPop();
-      onBack();
-    }
+  const handleCleanPredefinedData = () => {
+    soundEngine.playGentleChime();
+    storage.cleanAllPredefinedData();
+    onReloadAllData();
+    setShowCleanConfirm(false);
+    setShowResetConfirm(false);
+    setCleanSuccessMessage(
+      t(
+        'settings.cleanSuccess',
+        'Workspace cleaned! All sample data has been cleared and your companion is ready to start fresh.'
+      )
+    );
+    setTimeout(() => setCleanSuccessMessage(null), 4500);
+  };
+
+  const handleResetDemoData = () => {
+    soundEngine.playGentleChime();
+    storage.resetToDemoData();
+    onReloadAllData();
+    setShowResetConfirm(false);
+    setShowCleanConfirm(false);
+    setResetSuccessMessage(
+      t(
+        'settings.resetSuccess',
+        'Demo data restored! Sample tasks, habits, and journal entries are ready to explore.'
+      )
+    );
+    setTimeout(() => setResetSuccessMessage(null), 4500);
   };
 
   return (
@@ -1776,14 +1799,131 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
               </div>
             )}
 
-            <div className="pt-3 border-t border-[#DCEAD4] dark:border-[#2A3E26] flex justify-between items-center">
-              <button
-                onClick={handleResetData}
-                className="text-xs text-[#B3261E] dark:text-[#F2B8B5] hover:underline flex items-center gap-1.5 font-bold cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>{t('settings.resetDemoBtn', 'Reset Demo Data')}</span>
-              </button>
+            {/* Clean All Predefined Data (Start Fresh) */}
+            <div className="p-4 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] space-y-3">
+              <div className="flex items-start gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-950/70 border border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 flex items-center justify-center shrink-0">
+                  <Eraser className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-xs sm:text-sm font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                    {t('settings.cleanWorkspaceBtn', 'Clean All Predefined Tasks & Habits')}
+                  </h4>
+                  <p className="text-[11px] text-[#485B44] dark:text-[#9EB598] leading-relaxed mt-0.5">
+                    {t('settings.cleanWorkspaceDesc', 'Wipe out sample tasks, habits, and notes so you have a pristine, clean workspace ready for your own use. Your settings, API keys, and theme are preserved.')}
+                  </p>
+                </div>
+              </div>
+
+              {!showCleanConfirm ? (
+                <button
+                  type="button"
+                  id="btn-clean-predefined-data"
+                  onClick={() => {
+                    soundEngine.playPop();
+                    setShowCleanConfirm(true);
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-white dark:bg-[#202E1E] hover:bg-amber-50 dark:hover:bg-amber-950/50 text-amber-800 dark:text-amber-300 text-xs font-bold border border-amber-300 dark:border-amber-800/80 shadow-2xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Eraser className="w-3.5 h-3.5" />
+                  <span>{t('settings.cleanWorkspaceBtn', 'Clean All Predefined Tasks & Habits')}</span>
+                </button>
+              ) : (
+                <div className="p-3 rounded-xl bg-amber-50/90 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 space-y-2.5">
+                  <p className="text-xs font-semibold text-amber-950 dark:text-amber-200 leading-relaxed">
+                    {t('settings.cleanConfirmDesc', 'This will remove all sample habits, journal entries, brain dump thoughts, and schedules. Your settings and API keys will remain untouched.')}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowCleanConfirm(false)}
+                      className="flex-1 py-1.5 px-3 rounded-lg bg-white dark:bg-[#1C281A] text-xs font-bold text-[#485B44] dark:text-[#9EB598] border border-[#DCEAD4] dark:border-[#2A3E26] hover:bg-[#EDF6E8] cursor-pointer"
+                    >
+                      {t('common.cancel', 'Cancel')}
+                    </button>
+                    <button
+                      type="button"
+                      id="btn-confirm-clean-workspace"
+                      onClick={handleCleanPredefinedData}
+                      className="flex-1 py-1.5 px-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>{isDraftFa ? 'بله، همه را پاک کن' : 'Yes, Clean All'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {cleanSuccessMessage && (
+                <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-800 text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <span>{cleanSuccessMessage}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Reset Demo Data */}
+            <div className="p-4 rounded-2xl bg-[#F7FAF4] dark:bg-[#1A2617] border border-[#DCEAD4] dark:border-[#2A3E26] space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 flex items-center justify-center shrink-0">
+                  <RotateCcw className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-xs sm:text-sm font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                    {t('settings.resetDemoBtn', 'Reset Demo Data')}
+                  </h4>
+                  <p className="text-[11px] text-[#485B44] dark:text-[#9EB598] leading-relaxed mt-0.5">
+                    {t('settings.resetConfirmDesc', 'Restore sample habits, tasks, projects, and journal entries so you can explore all Lerni companion features? Your settings and API keys will remain untouched.')}
+                  </p>
+                </div>
+              </div>
+
+              {!showResetConfirm ? (
+                <button
+                  type="button"
+                  id="btn-reset-demo-data"
+                  onClick={() => {
+                    soundEngine.playPop();
+                    setShowResetConfirm(true);
+                    setShowCleanConfirm(false);
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-white dark:bg-[#202E1E] hover:bg-blue-50 dark:hover:bg-blue-950/50 text-blue-800 dark:text-blue-300 text-xs font-bold border border-blue-300 dark:border-blue-800/80 shadow-2xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>{t('settings.resetDemoBtn', 'Reset Demo Data')}</span>
+                </button>
+              ) : (
+                <div className="p-3 rounded-xl bg-blue-50/90 dark:bg-blue-950/60 border border-blue-300 dark:border-blue-800 space-y-2.5">
+                  <p className="text-xs font-semibold text-blue-950 dark:text-blue-200 leading-relaxed">
+                    {t('settings.resetConfirmDesc', 'Restore sample habits, tasks, projects, and journal entries so you can explore all Lerni companion features? Your settings and API keys will remain untouched.')}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowResetConfirm(false)}
+                      className="flex-1 py-1.5 px-3 rounded-lg bg-white dark:bg-[#1C281A] text-xs font-bold text-[#485B44] dark:text-[#9EB598] border border-[#DCEAD4] dark:border-[#2A3E26] hover:bg-[#EDF6E8] cursor-pointer"
+                    >
+                      {t('common.cancel', 'Cancel')}
+                    </button>
+                    <button
+                      type="button"
+                      id="btn-confirm-reset-demo"
+                      onClick={handleResetDemoData}
+                      className="flex-1 py-1.5 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>{isDraftFa ? 'بله، بازنشانی داده‌های نمونه' : 'Yes, Reset Demo Data'}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {resetSuccessMessage && (
+                <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-800 text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <span>{resetSuccessMessage}</span>
+                </div>
+              )}
             </div>
           </section>
 
