@@ -17,6 +17,8 @@ import {
   X,
   Trash2,
   ArrowLeft,
+  Download,
+  Check,
 } from 'lucide-react';
 import {
   BujoEntry,
@@ -34,6 +36,7 @@ import { soundEngine } from '../../utils/audioSynth';
 import { optimizeDailySchedule, generateStarterStepsForBlock, OptimizationResult, derivePaceFromSensoryState } from '../../utils/aiScheduler';
 import { MaterialExpressiveTimePicker } from '../common/MaterialExpressiveTimePicker';
 import { useI18n, formatMinutes, toPersianDigits } from '../../utils/i18n';
+import { downloadScheduleAsText } from '../../utils/scheduleExport';
 
 interface PlannerProps {
   entries: BujoEntry[];
@@ -64,6 +67,7 @@ export const Planner: React.FC<PlannerProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [downloadToast, setDownloadToast] = useState<string | null>(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [generatingStepsBlockId, setGeneratingStepsBlockId] = useState<string | null>(null);
 
@@ -288,6 +292,17 @@ export const Planner: React.FC<PlannerProps> = ({
     setDayPlan(null);
   };
 
+  // Download human-readable schedule as .txt file with date + time in filename
+  const handleDownloadSchedule = () => {
+    if (!dayPlan) return;
+    soundEngine.playGentleChime();
+    const exportedFilename = downloadScheduleAsText(dayPlan, language);
+    setDownloadToast(exportedFilename);
+    setTimeout(() => {
+      setDownloadToast(null);
+    }, 4500);
+  };
+
   const isToday = selectedDate === getTodayKey();
 
   const getEnergyBadgeText = (demand?: string) => {
@@ -365,6 +380,18 @@ export const Planner: React.FC<PlannerProps> = ({
                   <span>{formatMinutes(dayPlan.totalBreakMinutes, language)} {t('planner.restTime', 'Rest')}</span>
                 </span>
 
+                {/* Download / Export Schedule .txt Button */}
+                <button
+                  type="button"
+                  id="btn-download-schedule-txt"
+                  onClick={handleDownloadSchedule}
+                  className="px-3 py-1.5 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] hover:bg-[#D6F0BF] dark:hover:bg-[#284B00] text-[#1C3700] dark:text-[#80D141] border border-[#80D141]/50 text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                  title={t('planner.downloadTxtTitle', 'Download schedule as a readable text file for sharing or offline use')}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{t('planner.downloadTxt', 'Download .txt')}</span>
+                </button>
+
                 {/* Clear Plan Button */}
                 <button
                   type="button"
@@ -431,6 +458,36 @@ export const Planner: React.FC<PlannerProps> = ({
             </button>
           </motion.div>
         )}
+
+        {downloadToast && (
+          <motion.div
+            id="planner-download-success-toast"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/70 border border-emerald-300 dark:border-emerald-800 text-xs text-emerald-900 dark:text-emerald-100 flex items-center justify-between gap-3 shadow-xs"
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-xl bg-emerald-100 dark:bg-emerald-900/60 flex items-center justify-center shrink-0">
+                <Check className="w-4 h-4 text-emerald-700 dark:text-emerald-300 stroke-[2.5]" />
+              </div>
+              <div className="min-w-0">
+                <span className="font-bold">{t('planner.downloadSuccess', 'Schedule exported to .txt successfully!')}</span>
+                <span className="block text-[11px] opacity-80 font-mono truncate mt-0.5">
+                  {downloadToast}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDownloadToast(null)}
+              className="p-1 rounded-full hover:bg-emerald-200/50 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 transition-colors shrink-0 cursor-pointer"
+              aria-label={t('common.close', 'Close')}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* Generated Schedule Details or Pre-Generation Guide State */}
@@ -443,6 +500,16 @@ export const Planner: React.FC<PlannerProps> = ({
               <h3 className="font-display text-base font-bold text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-2">
                 <span>{t('planner.schedule', 'Schedule')}</span>
               </h3>
+              <button
+                type="button"
+                id="btn-download-schedule-section"
+                onClick={handleDownloadSchedule}
+                className="px-2.5 py-1 rounded-xl text-xs font-bold text-[#234A00] dark:text-[#80D141] bg-[#F2F8EE] dark:bg-[#141F12] hover:bg-[#E2F5D1] dark:hover:bg-[#1C2E17] border border-[#DCEAD4] dark:border-[#2A3E26] flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-2xs"
+                title={t('planner.downloadTxtTitle', 'Download schedule as a readable text file for sharing or offline use')}
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>{t('planner.downloadTxt', 'Download .txt')}</span>
+              </button>
             </div>
 
             <div className="space-y-3">

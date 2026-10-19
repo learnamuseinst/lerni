@@ -160,6 +160,27 @@ export type AiProvider = 'gemini' | 'openrouter';
 export const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-lite';
 export const DEFAULT_OPENROUTER_MODEL = 'google/gemini-2.5-flash';
 
+export interface AiModelPreset {
+  id: string;
+  name: string;
+}
+
+export const GEMINI_MODEL_PRESETS: AiModelPreset[] = [
+  { id: 'gemini-flash-lite-latest', name: 'Gemini Flash-Lite' },
+  { id: 'gemini-flash-latest', name: 'Gemini Flash' },
+  { id: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B' },
+  { id: 'gemma-4-31b-it', name: 'Gemma 4 31B' },
+];
+
+export const OPENROUTER_MODEL_PRESETS: AiModelPreset[] = [
+  { id: 'liquid/lfm-2.5-2.6b:free', name: 'LFM 2.5' },
+  { id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', name: 'Nemotron 3 Nano Omni' },
+  { id: 'nvidia/nemotron-3.5-lightning:free', name: 'Nemotron 3.5 Lightning' },
+  { id: 'nvidia/nemotron-3-super-120b-a12b:free', name: 'Nemotron 3 Super' },
+  { id: 'nvidia/nemotron-3-ultra-550b-a55b:free', name: 'Nemotron 3 Ultra' },
+  { id: 'thinkingmachines/inkling-small:free', name: 'Inkling Small' },
+];
+
 export interface UserPreferences {
   userName: string;
   language?: Language; // 'en' (LTR) | 'fa' (RTL)

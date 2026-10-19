@@ -42,7 +42,7 @@ import {
   MessageSquare,
   Zap
 } from 'lucide-react';
-import { UserPreferences, NavSection, DEFAULT_NAV_ORDER, Language, FocusTab, DEFAULT_FOCUS_TAB_ORDER, AiProvider, DEFAULT_GEMINI_MODEL, DEFAULT_OPENROUTER_MODEL } from '../types';
+import { UserPreferences, NavSection, DEFAULT_NAV_ORDER, Language, FocusTab, DEFAULT_FOCUS_TAB_ORDER, AiProvider, DEFAULT_GEMINI_MODEL, DEFAULT_OPENROUTER_MODEL, GEMINI_MODEL_PRESETS, OPENROUTER_MODEL_PRESETS } from '../types';
 import { storage, DEFAULT_JOURNAL_CATEGORIES } from '../utils/storage';
 import { soundEngine } from '../utils/audioSynth';
 import { LerniMascot } from './Mascot/LerniMascot';
@@ -822,16 +822,48 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                       </button>
                     </div>
 
-                    {/* Gemini Model Text Field */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-[#151E14] dark:text-[#E8F2E4] block">
-                        {t('settings.geminiModel', 'Gemini Model')}
-                      </label>
+                    {/* Gemini Model Field with Presets */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-[#151E14] dark:text-[#E8F2E4] block">
+                          {t('settings.geminiModel', 'Gemini Model')}
+                        </label>
+                        <span className="text-[10px] text-[#556D50] dark:text-[#8EA887]">
+                          {t('settings.presetModels', 'Preset Models')}
+                        </span>
+                      </div>
+
+                      {/* Gemini Preset Model Chips */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {GEMINI_MODEL_PRESETS.map((preset) => {
+                          const isSelected = geminiModelInput === preset.id;
+                          return (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              onClick={() => {
+                                soundEngine.playPop();
+                                setGeminiModelInput(preset.id);
+                              }}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                                isSelected
+                                  ? 'bg-[#E8F8D8] dark:bg-[#1E3800] border-[#80D141] text-[#1C3700] dark:text-[#80D141] font-bold shadow-2xs scale-[1.02]'
+                                  : 'bg-white dark:bg-[#202E1E] hover:bg-[#EDF6E8] dark:hover:bg-[#283A24] border-[#DCEAD4] dark:border-[#2E4229] text-[#3B4E37] dark:text-[#C5DDC0]'
+                              }`}
+                              title={preset.id}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-[#80D141]' : 'bg-transparent'}`} />
+                              <span>{preset.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
                       <input
                         type="text"
                         value={geminiModelInput}
                         onChange={(e) => setGeminiModelInput(e.target.value)}
-                        placeholder="gemini-3.1-flash-lite"
+                        placeholder="gemini-flash-lite-latest"
                         className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs font-mono text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
                       />
                     </div>
@@ -915,8 +947,8 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                       </button>
                     </div>
 
-                    {/* OpenRouter Model Text Field */}
-                    <div className="space-y-1.5">
+                    {/* OpenRouter Model Field with Presets */}
+                    <div className="space-y-2">
                       <div className="flex items-center justify-between flex-wrap gap-1.5">
                         <label className="text-[11px] font-bold text-[#151E14] dark:text-[#E8F2E4] block">
                           {t('settings.openRouterModel', 'OpenRouter Model')}
@@ -931,11 +963,38 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       </div>
+
+                      {/* OpenRouter Preset Model Chips */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {OPENROUTER_MODEL_PRESETS.map((preset) => {
+                          const isSelected = openRouterModelInput === preset.id;
+                          return (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              onClick={() => {
+                                soundEngine.playPop();
+                                setOpenRouterModelInput(preset.id);
+                              }}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                                isSelected
+                                  ? 'bg-[#E8F8D8] dark:bg-[#1E3800] border-[#80D141] text-[#1C3700] dark:text-[#80D141] font-bold shadow-2xs scale-[1.02]'
+                                  : 'bg-white dark:bg-[#202E1E] hover:bg-[#EDF6E8] dark:hover:bg-[#283A24] border-[#DCEAD4] dark:border-[#2E4229] text-[#3B4E37] dark:text-[#C5DDC0]'
+                              }`}
+                              title={preset.id}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-[#80D141]' : 'bg-transparent'}`} />
+                              <span>{preset.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
                       <input
                         type="text"
                         value={openRouterModelInput}
                         onChange={(e) => setOpenRouterModelInput(e.target.value)}
-                        placeholder="google/gemini-2.5-flash"
+                        placeholder="liquid/lfm-2.5-2.6b:free"
                         className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs font-mono text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
                       />
                       <p className="text-[10.5px] text-[#485B44] dark:text-[#9EB598]">
@@ -1119,19 +1178,19 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                 }}
                 className="space-y-2"
               >
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="text"
                     value={testPromptInput}
                     onChange={(e) => setTestPromptInput(e.target.value)}
                     placeholder={t('settings.testPromptPlaceholder', 'Type a prompt to test your API key (e.g., What is your model name?)...')}
-                    className="flex-1 px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs text-[#151E14] dark:text-[#E8F2E4] placeholder:text-[#79747E] dark:placeholder:text-[#8D9E8A] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+                    className="w-full sm:flex-1 min-w-0 px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs text-[#151E14] dark:text-[#E8F2E4] placeholder:text-[#79747E] dark:placeholder:text-[#8D9E8A] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
                   />
 
                   <button
                     type="submit"
                     disabled={testingPrompt || !testPromptInput.trim()}
-                    className="px-4 py-2.5 rounded-xl bg-[#80D141] hover:bg-[#72BF36] disabled:opacity-40 text-[#0F2600] text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#80D141] hover:bg-[#72BF36] disabled:opacity-40 text-[#0F2600] text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
                   >
                     {testingPrompt ? (
                       <>
@@ -1150,14 +1209,14 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
 
               {/* Model Response Container */}
               <div className="space-y-1.5 pt-1">
-                <div className="flex items-center justify-between text-xs font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                <div className="flex items-center justify-between text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] flex-wrap gap-1.5">
                   <span className="flex items-center gap-1.5">
                     <MessageSquare className="w-3.5 h-3.5 text-[#80D141]" />
                     <span>{t('settings.testResponseLabel', 'Model Response')}</span>
                   </span>
 
                   {promptTestResult && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {promptTestResult.latencyMs > 0 && (
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[#EDF6E8] dark:bg-[#20311D] text-[#3B4E37] dark:text-[#A7C59E] border border-[#D8E8D0] dark:border-[#2B4026] flex items-center gap-1">
                           <Zap className="w-3 h-3 text-amber-500" />
