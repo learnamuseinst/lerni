@@ -318,6 +318,10 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   geminiModel: 'gemini-3.1-flash-lite',
   openRouterApiKey: '',
   openRouterModel: 'google/gemini-2.5-flash',
+  customOpenAiBaseUrl: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_OPENAI_COMPATIBLE_BASE_URL) || 'http://localhost:11434/v1',
+  customOpenAiApiKey: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_OPENAI_COMPATIBLE_API_KEY) || '',
+  customOpenAiModel: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_OPENAI_COMPATIBLE_MODEL) || 'llama3.2',
+  customOpenAiApiVersion: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_OPENAI_COMPATIBLE_API_VERSION) || '',
   useSharedFreeKey: true,
   plannerCustomInstructions: '',
 };

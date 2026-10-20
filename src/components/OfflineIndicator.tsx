@@ -57,7 +57,7 @@ export const OfflineIndicator: React.FC = () => {
   };
 
   return (
-    <div id="offline-pwa-indicator-wrapper" className="fixed bottom-20 sm:bottom-4 left-4 z-40 flex flex-col gap-2 pointer-events-none">
+    <div id="offline-pwa-indicator-wrapper" className="fixed bottom-20 sm:bottom-4 left-4 rtl:left-auto rtl:right-4 z-40 flex flex-col gap-2 pointer-events-none">
       {/* Offline Status Badge */}
       <AnimatePresence>
         {!isOnline && (

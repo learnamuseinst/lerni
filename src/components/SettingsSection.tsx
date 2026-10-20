@@ -40,9 +40,28 @@ import {
   Terminal,
   Send,
   MessageSquare,
-  Zap
+  Zap,
+  Server,
+  Layers,
+  Cpu,
 } from 'lucide-react';
-import { UserPreferences, NavSection, DEFAULT_NAV_ORDER, Language, FocusTab, DEFAULT_FOCUS_TAB_ORDER, AiProvider, DEFAULT_GEMINI_MODEL, DEFAULT_OPENROUTER_MODEL, GEMINI_MODEL_PRESETS, OPENROUTER_MODEL_PRESETS } from '../types';
+import {
+  UserPreferences,
+  NavSection,
+  DEFAULT_NAV_ORDER,
+  Language,
+  FocusTab,
+  DEFAULT_FOCUS_TAB_ORDER,
+  AiProvider,
+  DEFAULT_GEMINI_MODEL,
+  DEFAULT_OPENROUTER_MODEL,
+  DEFAULT_CUSTOM_OPENAI_BASE_URL,
+  DEFAULT_CUSTOM_OPENAI_MODEL,
+  GEMINI_MODEL_PRESETS,
+  OPENROUTER_MODEL_PRESETS,
+  CUSTOM_OPENAI_PRESETS,
+  isLocalEndpoint,
+} from '../types';
 import { storage, DEFAULT_JOURNAL_CATEGORIES } from '../utils/storage';
 import { soundEngine } from '../utils/audioSynth';
 import { LerniMascot } from './Mascot/LerniMascot';
@@ -87,6 +106,10 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
         prevPrefsRef.current.geminiModel !== prefs.geminiModel ||
         prevPrefsRef.current.openRouterApiKey !== prefs.openRouterApiKey ||
         prevPrefsRef.current.openRouterModel !== prefs.openRouterModel ||
+        prevPrefsRef.current.customOpenAiBaseUrl !== prefs.customOpenAiBaseUrl ||
+        prevPrefsRef.current.customOpenAiApiKey !== prefs.customOpenAiApiKey ||
+        prevPrefsRef.current.customOpenAiModel !== prefs.customOpenAiModel ||
+        prevPrefsRef.current.customOpenAiApiVersion !== prefs.customOpenAiApiVersion ||
         prevPrefsRef.current.plannerCustomInstructions !== prefs.plannerCustomInstructions ||
         prevPrefsRef.current.navOrder !== prefs.navOrder ||
         prevPrefsRef.current.focusTabOrder !== prefs.focusTabOrder ||
@@ -98,6 +121,26 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
         setGeminiModelInput(prefs.geminiModel || DEFAULT_GEMINI_MODEL);
         setOpenRouterKeyInput(prefs.openRouterApiKey || '');
         setOpenRouterModelInput(prefs.openRouterModel || DEFAULT_OPENROUTER_MODEL);
+        setCustomBaseUrlInput(
+          prefs.customOpenAiBaseUrl ||
+            (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_OPENAI_COMPATIBLE_BASE_URL : '') ||
+            DEFAULT_CUSTOM_OPENAI_BASE_URL
+        );
+        setCustomKeyInput(
+          prefs.customOpenAiApiKey ||
+            (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_OPENAI_COMPATIBLE_API_KEY : '') ||
+            ''
+        );
+        setCustomModelInput(
+          prefs.customOpenAiModel ||
+            (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_OPENAI_COMPATIBLE_MODEL : '') ||
+            DEFAULT_CUSTOM_OPENAI_MODEL
+        );
+        setCustomApiVersionInput(
+          prefs.customOpenAiApiVersion ||
+            (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_OPENAI_COMPATIBLE_API_VERSION : '') ||
+            ''
+        );
         setPlannerInstructionsInput(prefs.plannerCustomInstructions || '');
       }
       prevPrefsRef.current = prefs;
@@ -117,6 +160,30 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   const [geminiModelInput, setGeminiModelInput] = useState(prefs.geminiModel || DEFAULT_GEMINI_MODEL);
   const [openRouterKeyInput, setOpenRouterKeyInput] = useState(prefs.openRouterApiKey || '');
   const [openRouterModelInput, setOpenRouterModelInput] = useState(prefs.openRouterModel || DEFAULT_OPENROUTER_MODEL);
+
+  // Custom OpenAI-compatible state
+  const [customBaseUrlInput, setCustomBaseUrlInput] = useState(
+    prefs.customOpenAiBaseUrl ||
+      (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_OPENAI_COMPATIBLE_BASE_URL : '') ||
+      DEFAULT_CUSTOM_OPENAI_BASE_URL
+  );
+  const [customKeyInput, setCustomKeyInput] = useState(
+    prefs.customOpenAiApiKey ||
+      (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_OPENAI_COMPATIBLE_API_KEY : '') ||
+      ''
+  );
+  const [customModelInput, setCustomModelInput] = useState(
+    prefs.customOpenAiModel ||
+      (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_OPENAI_COMPATIBLE_MODEL : '') ||
+      DEFAULT_CUSTOM_OPENAI_MODEL
+  );
+  const [customApiVersionInput, setCustomApiVersionInput] = useState(
+    prefs.customOpenAiApiVersion ||
+      (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_OPENAI_COMPATIBLE_API_VERSION : '') ||
+      ''
+  );
+  const [selectedCustomPresetId, setSelectedCustomPresetId] = useState<string>('ollama');
+
   const [showKey, setShowKey] = useState(false);
   const [testingKey, setTestingKey] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -182,7 +249,26 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     soundEngine.playGentleChime();
     setTestResult(null);
 
-    if (selectedProvider === 'openrouter') {
+    if (selectedProvider === 'custom') {
+      const cleanBaseUrl = customBaseUrlInput.trim() || DEFAULT_CUSTOM_OPENAI_BASE_URL;
+      const cleanKey = customKeyInput.trim();
+      const cleanModel = customModelInput.trim() || DEFAULT_CUSTOM_OPENAI_MODEL;
+      const cleanApiVersion = customApiVersionInput.trim();
+
+      setDraftPrefs((prev) => ({
+        ...prev,
+        aiProvider: 'custom',
+        customOpenAiBaseUrl: cleanBaseUrl,
+        customOpenAiApiKey: cleanKey,
+        customOpenAiModel: cleanModel,
+        customOpenAiApiVersion: cleanApiVersion,
+      }));
+      setKeySavedMessage(
+        isDraftFa
+          ? 'تنظیمات API سفارشی ثبت شد (برای اعمال، روی «ذخیره» کلیک کنید)'
+          : 'Custom OpenAI-compatible API staged (click Save to apply)!'
+      );
+    } else if (selectedProvider === 'openrouter') {
       const cleanOrKey = openRouterKeyInput.trim();
       const cleanModel = openRouterModelInput.trim() || DEFAULT_OPENROUTER_MODEL;
       setDraftPrefs((prev) => ({
@@ -218,7 +304,11 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   const handleClearKey = () => {
     soundEngine.playPop();
     setTestResult(null);
-    if (selectedProvider === 'openrouter') {
+    if (selectedProvider === 'custom') {
+      setCustomKeyInput('');
+      setDraftPrefs((prev) => ({ ...prev, customOpenAiApiKey: '' }));
+      setKeySavedMessage(isDraftFa ? 'کلید API سفارشی پاک شد.' : 'Custom API key cleared.');
+    } else if (selectedProvider === 'openrouter') {
       setOpenRouterKeyInput('');
       setDraftPrefs((prev) => ({ ...prev, openRouterApiKey: '' }));
       setKeySavedMessage(isDraftFa ? 'کلید OpenRouter پاک شد.' : 'OpenRouter API key cleared.');
@@ -236,37 +326,85 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     soundEngine.playPop();
 
     try {
+      const isCustom = selectedProvider === 'custom';
       const isOpenRouter = selectedProvider === 'openrouter';
-      const activeKey = isOpenRouter
-        ? (openRouterKeyInput.trim() || draftPrefs.openRouterApiKey?.trim() || prefs.openRouterApiKey?.trim())
-        : (apiKeyInput.trim() || draftPrefs.geminiApiKey?.trim() || prefs.geminiApiKey?.trim());
-      const activeModel = isOpenRouter
-        ? (openRouterModelInput.trim() || draftPrefs.openRouterModel || DEFAULT_OPENROUTER_MODEL)
-        : (geminiModelInput.trim() || draftPrefs.geminiModel || DEFAULT_GEMINI_MODEL);
+
+      let activeKey = '';
+      let activeModel = '';
+      let activeBaseUrl: string | undefined = undefined;
+      let activeApiVersion: string | undefined = undefined;
+
+      if (isCustom) {
+        activeKey =
+          customKeyInput.trim() ||
+          draftPrefs.customOpenAiApiKey?.trim() ||
+          prefs.customOpenAiApiKey?.trim() ||
+          '';
+        activeModel =
+          customModelInput.trim() ||
+          draftPrefs.customOpenAiModel ||
+          DEFAULT_CUSTOM_OPENAI_MODEL;
+        activeBaseUrl =
+          customBaseUrlInput.trim() ||
+          draftPrefs.customOpenAiBaseUrl ||
+          DEFAULT_CUSTOM_OPENAI_BASE_URL;
+        activeApiVersion =
+          customApiVersionInput.trim() ||
+          draftPrefs.customOpenAiApiVersion ||
+          undefined;
+      } else if (isOpenRouter) {
+        activeKey =
+          openRouterKeyInput.trim() ||
+          draftPrefs.openRouterApiKey?.trim() ||
+          prefs.openRouterApiKey?.trim() ||
+          '';
+        activeModel =
+          openRouterModelInput.trim() ||
+          draftPrefs.openRouterModel ||
+          DEFAULT_OPENROUTER_MODEL;
+      } else {
+        activeKey =
+          apiKeyInput.trim() ||
+          draftPrefs.geminiApiKey?.trim() ||
+          prefs.geminiApiKey?.trim() ||
+          '';
+        activeModel =
+          geminiModelInput.trim() ||
+          draftPrefs.geminiModel ||
+          DEFAULT_GEMINI_MODEL;
+      }
 
       const data = await testAiConnection({
         provider: selectedProvider,
         apiKey: activeKey || undefined,
         model: activeModel,
+        baseUrl: activeBaseUrl,
+        apiVersion: activeApiVersion,
       });
 
       if (data.valid) {
         soundEngine.playGentleChime();
         setTestResult({
           success: true,
-          message: data.message || (isDraftFa ? 'اتصال با موفقیت برقرار شد!' : 'Connected to AI API successfully!'),
+          message:
+            data.message ||
+            (isDraftFa ? 'اتصال با موفقیت برقرار شد!' : 'Connected to AI API successfully!'),
         });
       } else {
         soundEngine.playPop();
         setTestResult({
           success: false,
-          message: data.message || (isDraftFa ? 'عدم امکان اتصال به سرویس هوش مصنوعی.' : 'Could not connect to AI API.'),
+          message:
+            data.message ||
+            (isDraftFa ? 'عدم امکان اتصال به سرویس هوش مصنوعی.' : 'Could not connect to AI API.'),
         });
       }
     } catch (err: any) {
       setTestResult({
         success: false,
-        message: err.message || (isDraftFa ? 'خطای شبکه در بررسی اتصال.' : 'Network error while testing connection.'),
+        message:
+          err.message ||
+          (isDraftFa ? 'خطای شبکه در بررسی اتصال.' : 'Network error while testing connection.'),
       });
     } finally {
       setTestingKey(false);
@@ -277,15 +415,55 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     const promptToSend = (typeof customPrompt === 'string' ? customPrompt : testPromptInput).trim();
     if (!promptToSend) return;
 
+    const isCustom = selectedProvider === 'custom';
     const isOpenRouter = selectedProvider === 'openrouter';
-    const activeKey = isOpenRouter
-      ? (openRouterKeyInput.trim() || draftPrefs.openRouterApiKey?.trim() || prefs.openRouterApiKey?.trim())
-      : (apiKeyInput.trim() || draftPrefs.geminiApiKey?.trim() || prefs.geminiApiKey?.trim());
-    const activeModel = isOpenRouter
-      ? (openRouterModelInput.trim() || draftPrefs.openRouterModel || DEFAULT_OPENROUTER_MODEL)
-      : (geminiModelInput.trim() || draftPrefs.geminiModel || DEFAULT_GEMINI_MODEL);
 
-    if (!activeKey) {
+    let activeKey = '';
+    let activeModel = '';
+    let activeBaseUrl: string | undefined = undefined;
+    let activeApiVersion: string | undefined = undefined;
+
+    if (isCustom) {
+      activeKey =
+        customKeyInput.trim() ||
+        draftPrefs.customOpenAiApiKey?.trim() ||
+        prefs.customOpenAiApiKey?.trim() ||
+        '';
+      activeModel =
+        customModelInput.trim() ||
+        draftPrefs.customOpenAiModel ||
+        DEFAULT_CUSTOM_OPENAI_MODEL;
+      activeBaseUrl =
+        customBaseUrlInput.trim() ||
+        draftPrefs.customOpenAiBaseUrl ||
+        DEFAULT_CUSTOM_OPENAI_BASE_URL;
+      activeApiVersion =
+        customApiVersionInput.trim() ||
+        draftPrefs.customOpenAiApiVersion ||
+        undefined;
+    } else if (isOpenRouter) {
+      activeKey =
+        openRouterKeyInput.trim() ||
+        draftPrefs.openRouterApiKey?.trim() ||
+        prefs.openRouterApiKey?.trim() ||
+        '';
+      activeModel =
+        openRouterModelInput.trim() ||
+        draftPrefs.openRouterModel ||
+        DEFAULT_OPENROUTER_MODEL;
+    } else {
+      activeKey =
+        apiKeyInput.trim() ||
+        draftPrefs.geminiApiKey?.trim() ||
+        prefs.geminiApiKey?.trim() ||
+        '';
+      activeModel =
+        geminiModelInput.trim() ||
+        draftPrefs.geminiModel ||
+        DEFAULT_GEMINI_MODEL;
+    }
+
+    if (!activeKey && !(isCustom && isLocalEndpoint(activeBaseUrl))) {
       soundEngine.playPop();
       setPromptTestResult({
         success: false,
@@ -306,9 +484,11 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     try {
       const result = await testAiPrompt({
         provider: selectedProvider,
-        apiKey: activeKey,
+        apiKey: activeKey || undefined,
         model: activeModel,
         prompt: promptToSend,
+        baseUrl: activeBaseUrl,
+        apiVersion: activeApiVersion,
       });
 
       if (result.valid) {
@@ -391,6 +571,10 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     (geminiModelInput.trim() || DEFAULT_GEMINI_MODEL) !== (prefs.geminiModel || DEFAULT_GEMINI_MODEL) ||
     openRouterKeyInput.trim() !== (prefs.openRouterApiKey || '') ||
     (openRouterModelInput.trim() || DEFAULT_OPENROUTER_MODEL) !== (prefs.openRouterModel || DEFAULT_OPENROUTER_MODEL) ||
+    customBaseUrlInput.trim() !== (prefs.customOpenAiBaseUrl || DEFAULT_CUSTOM_OPENAI_BASE_URL) ||
+    customKeyInput.trim() !== (prefs.customOpenAiApiKey || '') ||
+    (customModelInput.trim() || DEFAULT_CUSTOM_OPENAI_MODEL) !== (prefs.customOpenAiModel || DEFAULT_CUSTOM_OPENAI_MODEL) ||
+    customApiVersionInput.trim() !== (prefs.customOpenAiApiVersion || '') ||
     plannerInstructionsInput.trim() !== (prefs.plannerCustomInstructions || '') ||
     JSON.stringify(currentNavOrder) !== JSON.stringify(initialNavOrder) ||
     JSON.stringify(currentFocusTabOrder) !== JSON.stringify(initialFocusTabOrder) ||
@@ -403,6 +587,10 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     const cleanGeminiModel = geminiModelInput.trim() || DEFAULT_GEMINI_MODEL;
     const cleanOpenRouterKey = openRouterKeyInput.trim();
     const cleanOpenRouterModel = openRouterModelInput.trim() || DEFAULT_OPENROUTER_MODEL;
+    const cleanCustomBaseUrl = customBaseUrlInput.trim() || DEFAULT_CUSTOM_OPENAI_BASE_URL;
+    const cleanCustomKey = customKeyInput.trim();
+    const cleanCustomModel = customModelInput.trim() || DEFAULT_CUSTOM_OPENAI_MODEL;
+    const cleanCustomApiVersion = customApiVersionInput.trim();
     const targetLang = draftPrefs.language || prefs.language || 'en';
     const finalPrefs: UserPreferences = {
       ...draftPrefs,
@@ -415,6 +603,10 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
       geminiModel: cleanGeminiModel,
       openRouterApiKey: cleanOpenRouterKey,
       openRouterModel: cleanOpenRouterModel,
+      customOpenAiBaseUrl: cleanCustomBaseUrl,
+      customOpenAiApiKey: cleanCustomKey,
+      customOpenAiModel: cleanCustomModel,
+      customOpenAiApiVersion: cleanCustomApiVersion,
       useSharedFreeKey: false,
       plannerCustomInstructions: plannerInstructionsInput.trim(),
     };
@@ -730,7 +922,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
             </div>
 
             {/* AI Provider Selector Tabs */}
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <button
                 id="btn-provider-gemini"
                 type="button"
@@ -775,6 +967,31 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                   </div>
                 </div>
                 {selectedProvider === 'openrouter' && (
+                  <div className="w-5 h-5 rounded-full bg-[#80D141] text-[#0F2600] flex items-center justify-center shrink-0">
+                    <Check className="w-3 h-3 stroke-[3]" />
+                  </div>
+                )}
+              </button>
+
+              <button
+                id="btn-provider-custom"
+                type="button"
+                onClick={() => handleProviderChange('custom')}
+                className={`p-3 rounded-2xl flex items-center justify-between border transition-all text-start cursor-pointer ${
+                  selectedProvider === 'custom'
+                    ? 'bg-[#80D141]/15 dark:bg-[#80D141]/20 border-[#80D141] shadow-xs ring-1 ring-[#80D141]'
+                    : 'bg-[#F7FAF4] dark:bg-[#1C2919] text-[#485B44] dark:text-[#9EB598] border-[#DCEAD4] dark:border-[#2A3E26] hover:bg-[#E2F5D1]'
+                }`}
+              >
+                <div>
+                  <div className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                    {t('settings.providerCustom', 'Custom (OpenAI)')}
+                  </div>
+                  <div className="text-[10px] text-[#485B44] dark:text-[#9EB598]">
+                    {isDraftFa ? 'اتصال به Ollama، Groq و...' : 'Ollama, Groq, DeepSeek, etc.'}
+                  </div>
+                </div>
+                {selectedProvider === 'custom' && (
                   <div className="w-5 h-5 rounded-full bg-[#80D141] text-[#0F2600] flex items-center justify-center shrink-0">
                     <Check className="w-3 h-3 stroke-[3]" />
                   </div>
@@ -909,7 +1126,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                     </a>
                   </div>
                 </div>
-              ) : (
+              ) : selectedProvider === 'openrouter' ? (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-1.5">
@@ -1043,6 +1260,250 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                     </a>
                   </div>
                 </div>
+              ) : (
+                <div className="space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-1.5">
+                      <Cpu className="w-3.5 h-3.5 text-[#80D141]" />
+                      <span>{t('settings.providerCustom', 'Custom OpenAI-Compatible API')}</span>
+                    </label>
+
+                    {(draftPrefs.customOpenAiApiKey || customKeyInput || customBaseUrlInput !== DEFAULT_CUSTOM_OPENAI_BASE_URL) && (
+                      <button
+                        type="button"
+                        onClick={handleClearKey}
+                        className="text-[11px] text-[#B3261E] dark:text-[#F2B8B5] hover:underline font-medium cursor-pointer"
+                      >
+                        {isDraftFa ? 'پاک کردن کلید' : 'Clear key'}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Quick Service Presets */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-[#151E14] dark:text-[#E8F2E4] block">
+                        {t('settings.presetEndpoints', 'Quick Service Presets')}
+                      </label>
+                      <span className="text-[10px] text-[#556D50] dark:text-[#8EA887]">
+                        {isDraftFa ? 'تنظیم خودکار آدرس و مدل' : 'Auto-fills endpoint & model'}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {CUSTOM_OPENAI_PRESETS.map((preset) => {
+                        const isSelected =
+                          selectedCustomPresetId === preset.id ||
+                          customBaseUrlInput.trim().toLowerCase().startsWith(preset.baseUrl.toLowerCase());
+                        return (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() => {
+                              soundEngine.playPop();
+                              setSelectedCustomPresetId(preset.id);
+                              setCustomBaseUrlInput(preset.baseUrl);
+                              setCustomModelInput(preset.defaultModel);
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                              isSelected
+                                ? 'bg-[#E8F8D8] dark:bg-[#1E3800] border-[#80D141] text-[#1C3700] dark:text-[#80D141] font-bold shadow-2xs scale-[1.02]'
+                                : 'bg-white dark:bg-[#202E1E] hover:bg-[#EDF6E8] dark:hover:bg-[#283A24] border-[#DCEAD4] dark:border-[#2E4229] text-[#3B4E37] dark:text-[#C5DDC0]'
+                            }`}
+                            title={preset.description}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-[#80D141]' : 'bg-transparent'}`} />
+                            <span>{preset.name}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleSaveCustomKey} className="space-y-3">
+                    {/* Endpoint / Base URL */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between flex-wrap gap-1">
+                        <label className="text-[11px] font-bold text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-1.5">
+                          <Server className="w-3.5 h-3.5 text-[#80D141]" />
+                          <span>{t('settings.customEndpointLabel', 'API Base URL / Endpoint')}</span>
+                        </label>
+                        {isLocalEndpoint(customBaseUrlInput) ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1C3700] dark:text-[#80D141] border border-[#80D141]/40 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#80D141] animate-pulse" />
+                            {isDraftFa ? 'سرویس محلی (آفلاین / بدون کلید)' : 'Local server (offline / no key needed)'}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-[#556D50] dark:text-[#8EA887]">
+                            {isDraftFa ? 'پایانه ابری (نیاز به کلید Bearer)' : 'Cloud endpoint (Bearer key required)'}
+                          </span>
+                        )}
+                      </div>
+
+                      <input
+                        type="text"
+                        value={customBaseUrlInput}
+                        onChange={(e) => setCustomBaseUrlInput(e.target.value)}
+                        placeholder="http://localhost:11434/v1"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs font-mono text-[#151E14] dark:text-[#E8F2E4] placeholder:font-sans placeholder:text-[#79747E] dark:placeholder:text-[#8D9E8A] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+                      />
+                      <p className="text-[10.5px] text-[#485B44] dark:text-[#9EB598]">
+                        {t('settings.customEndpointHint', 'Works with any OpenAI-compatible /chat/completions endpoint (local or cloud).')}
+                      </p>
+                    </div>
+
+                    {/* API Key */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-1.5">
+                          <Key className="w-3.5 h-3.5 text-[#80D141]" />
+                          <span>{t('settings.customApiKeyLabel', 'API Key (Optional for Local)')}</span>
+                        </label>
+                        {isLocalEndpoint(customBaseUrlInput) && (
+                          <span className="text-[10px] text-[#556D50] dark:text-[#8EA887]">
+                            {isDraftFa ? 'اختیاری برای سرورهای محلی' : 'Optional for local servers'}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="relative flex items-center">
+                        <input
+                          type={showKey ? 'text' : 'password'}
+                          value={customKeyInput}
+                          onChange={(e) => setCustomKeyInput(e.target.value)}
+                          placeholder={
+                            isLocalEndpoint(customBaseUrlInput)
+                              ? (isDraftFa ? 'برای Ollama و LM Studio خالی بگذارید' : 'Leave empty for Ollama / LM Studio')
+                              : (isDraftFa ? 'کلید API را وارد کنید (Bearer token)' : 'Paste API Key (Bearer token)')
+                          }
+                          className="w-full pl-3.5 pr-20 py-2.5 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs font-mono text-[#151E14] dark:text-[#E8F2E4] placeholder:font-sans placeholder:text-[#79747E] dark:placeholder:text-[#8D9E8A] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowKey(!showKey)}
+                          className="absolute right-2.5 p-1 rounded-lg text-[#79747E] hover:text-[#151E14] dark:hover:text-[#E8F2E4] transition-colors cursor-pointer"
+                          title={showKey ? 'Hide key' : 'Show key'}
+                        >
+                          {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Model Name with Presets */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-1.5">
+                          <Zap className="w-3.5 h-3.5 text-[#80D141]" />
+                          <span>{t('settings.customModelLabel', 'Model Name / ID')}</span>
+                        </label>
+                        <span className="text-[10px] text-[#556D50] dark:text-[#8EA887]">
+                          {t('settings.presetModels', 'Preset Models')}
+                        </span>
+                      </div>
+
+                      {/* Matching Preset Model Chips */}
+                      {(() => {
+                        const activePreset =
+                          CUSTOM_OPENAI_PRESETS.find((p) => p.id === selectedCustomPresetId) ||
+                          CUSTOM_OPENAI_PRESETS.find((p) => customBaseUrlInput.toLowerCase().includes(p.id)) ||
+                          CUSTOM_OPENAI_PRESETS[0];
+                        if (!activePreset || !activePreset.models.length) return null;
+                        return (
+                          <div className="flex flex-wrap gap-1.5">
+                            {activePreset.models.map((model) => {
+                              const isSelected = customModelInput === model.id;
+                              return (
+                                <button
+                                  key={model.id}
+                                  type="button"
+                                  onClick={() => {
+                                    soundEngine.playPop();
+                                    setCustomModelInput(model.id);
+                                  }}
+                                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                                    isSelected
+                                      ? 'bg-[#E8F8D8] dark:bg-[#1E3800] border-[#80D141] text-[#1C3700] dark:text-[#80D141] font-bold shadow-2xs scale-[1.02]'
+                                      : 'bg-white dark:bg-[#202E1E] hover:bg-[#EDF6E8] dark:hover:bg-[#283A24] border-[#DCEAD4] dark:border-[#2E4229] text-[#3B4E37] dark:text-[#C5DDC0]'
+                                  }`}
+                                  title={model.id}
+                                >
+                                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-[#80D141]' : 'bg-transparent'}`} />
+                                  <span>{model.name}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+
+                      <input
+                        type="text"
+                        value={customModelInput}
+                        onChange={(e) => setCustomModelInput(e.target.value)}
+                        placeholder="llama3.2"
+                        className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs font-mono text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+                      />
+                    </div>
+
+                    {/* API Version (Optional, for Azure or Gateways) */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-1.5">
+                          <Sliders className="w-3.5 h-3.5 text-[#80D141]" />
+                          <span>{t('settings.customApiVersionLabel', 'API Version (Optional)')}</span>
+                        </label>
+                        <span className="text-[10px] text-[#556D50] dark:text-[#8EA887]">
+                          {isDraftFa ? 'مثلاً برای Azure' : 'e.g. for Azure'}
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        value={customApiVersionInput}
+                        onChange={(e) => setCustomApiVersionInput(e.target.value)}
+                        placeholder="2024-02-15-preview"
+                        className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs font-mono text-[#151E14] dark:text-[#E8F2E4] placeholder:font-sans placeholder:text-[#79747E] dark:placeholder:text-[#8D9E8A] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+                      />
+                      <p className="text-[10px] text-[#485B44] dark:text-[#9EB598]">
+                        {isDraftFa
+                          ? 'سرورهای معمولی OpenAI نیازی به نسخه ندارند. در صورت استفاده از Azure، نسخه API را اینجا بنویسید.'
+                          : 'Standard OpenAI & local servers leave this blank. For Azure OpenAI, enter your api-version query string.'}
+                      </p>
+                    </div>
+
+                    {/* Environment Variables Reference Info */}
+                    <div className="p-3 rounded-xl bg-[#E8F8D8]/60 dark:bg-[#20341B]/60 border border-[#80D141]/30 text-[10.5px] space-y-1">
+                      <div className="font-bold text-[#1C3700] dark:text-[#80D141] flex items-center gap-1.5">
+                        <Terminal className="w-3.5 h-3.5" />
+                        <span>{isDraftFa ? 'متغیرهای محیطی پشتیبانی‌شده (ENV)' : 'Supported Environment Variables (.env)'}</span>
+                      </div>
+                      <div className="font-mono text-[10px] text-[#344F2D] dark:text-[#BBD5B4] space-y-0.5">
+                        <div><span className="text-[#1C3700] dark:text-[#80D141] font-semibold">VITE_OPENAI_COMPATIBLE_BASE_URL</span>: {customBaseUrlInput || DEFAULT_CUSTOM_OPENAI_BASE_URL}</div>
+                        <div><span className="text-[#1C3700] dark:text-[#80D141] font-semibold">VITE_OPENAI_COMPATIBLE_API_KEY</span>: {customKeyInput ? '••••••••' : '(empty / optional)'}</div>
+                        <div><span className="text-[#1C3700] dark:text-[#80D141] font-semibold">VITE_OPENAI_COMPATIBLE_MODEL</span>: {customModelInput || DEFAULT_CUSTOM_OPENAI_MODEL}</div>
+                        <div><span className="text-[#1C3700] dark:text-[#80D141] font-semibold">VITE_OPENAI_COMPATIBLE_API_VERSION</span>: {customApiVersionInput || '(none)'}</div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="submit"
+                        className="px-4 py-2 rounded-xl bg-[#80D141] hover:bg-[#72BF36] text-[#0F2600] text-xs font-bold shadow-xs transition-all cursor-pointer"
+                      >
+                        {t('settings.saveKey', 'Save Configuration')}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleTestConnection}
+                        disabled={testingKey}
+                        className="px-3.5 py-2 rounded-xl bg-white dark:bg-[#263722] hover:bg-[#E2F2D9] dark:hover:bg-[#2E4229] disabled:opacity-40 text-[#3B4E37] dark:text-[#B6CCB0] text-xs font-bold border border-[#DCEAD4] dark:border-[#33482E] transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        {testingKey ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                        <span>{t('settings.testKey', 'Test Connection')}</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
               )}
             </div>
 
@@ -1102,12 +1563,16 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                     <h4 className="text-xs sm:text-sm font-bold text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-2 flex-wrap">
                       <span>{t('settings.testPlaygroundTitle', 'API Key Tester & Query Playground')}</span>
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#E8F8D8] dark:bg-[#23351F] text-[#2C5214] dark:text-[#9DD86A] border border-[#80D141]/40">
-                        {selectedProvider === 'openrouter' ? `OpenRouter · ${openRouterModelInput || DEFAULT_OPENROUTER_MODEL}` : `Gemini · ${geminiModelInput || DEFAULT_GEMINI_MODEL}`}
+                        {selectedProvider === 'custom'
+                          ? `Custom · ${customModelInput || DEFAULT_CUSTOM_OPENAI_MODEL}`
+                          : selectedProvider === 'openrouter'
+                          ? `OpenRouter · ${openRouterModelInput || DEFAULT_OPENROUTER_MODEL}`
+                          : `Gemini · ${geminiModelInput || DEFAULT_GEMINI_MODEL}`}
                       </span>
                     </h4>
                     <p className="text-[11px] text-[#485B44] dark:text-[#9EB598] mt-0.5 flex items-center justify-between flex-wrap gap-2">
                       <span>{t('settings.testPlaygroundDesc', 'Send a single-turn prompt to verify your API key and chosen model respond accurately in real time.')}</span>
-                      {selectedProvider === 'openrouter' && (
+                      {selectedProvider === 'openrouter' ? (
                         <a
                           href="https://openrouter.ai/models?variant=free&output_modalities=text"
                           target="_blank"
@@ -1117,7 +1582,11 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                           <span>{t('settings.openRouterFreeModelsLink', 'Browse Free Text Models')}</span>
                           <ExternalLink className="w-3 h-3" />
                         </a>
-                      )}
+                      ) : selectedProvider === 'custom' ? (
+                        <span className="text-[10.5px] font-mono text-[#3B7E10] dark:text-[#80D141]">
+                          {customBaseUrlInput || DEFAULT_CUSTOM_OPENAI_BASE_URL}
+                        </span>
+                      ) : null}
                     </p>
                   </div>
                 </div>

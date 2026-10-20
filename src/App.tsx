@@ -364,7 +364,7 @@ export default function App() {
           </main>
         </div>
 
-        {/* Unified Floating Action Button (FAB) anchored to Bottom Right */}
+        {/* Unified Floating Action Button (FAB) anchored to Bottom Right (LTR) or Bottom Left (RTL) */}
         <AnimatePresence>
           {fabConfig && !isAnyModalOpen && (
             <motion.button
@@ -378,7 +378,11 @@ export default function App() {
               transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
               onClick={handleFabClick}
               disabled={activeSection === 'planner' && isPlannerGenerating}
-              className="fixed bottom-24 right-5 sm:bottom-8 sm:right-8 z-30 w-14 h-14 rounded-2xl bg-[#80D141] hover:bg-[#72BF36] text-[#0F2600] flex items-center justify-center shadow-xl hover:shadow-2xl border border-[#6EBD32] select-none touch-manipulation cursor-pointer disabled:opacity-80 transition-shadow"
+              className={`fixed bottom-24 sm:bottom-8 z-30 w-14 h-14 rounded-2xl bg-[#80D141] hover:bg-[#72BF36] text-[#0F2600] flex items-center justify-center shadow-xl hover:shadow-2xl border border-[#6EBD32] select-none touch-manipulation cursor-pointer disabled:opacity-80 transition-all ${
+                isRTL(prefs.language)
+                  ? 'left-5 sm:left-8 right-auto'
+                  : 'right-5 sm:right-8 left-auto'
+              }`}
               aria-label={fabConfig.label}
               title={fabConfig.label}
             >

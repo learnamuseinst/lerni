@@ -155,27 +155,134 @@ export const DEFAULT_FOCUS_TAB_ORDER: FocusTab[] = [
   'tracker',
 ];
 
-export type AiProvider = 'gemini' | 'openrouter';
+export type AiProvider = 'gemini' | 'openrouter' | 'custom';
 
 export const DEFAULT_GEMINI_MODEL = 'gemini-3.1-flash-lite';
 export const DEFAULT_OPENROUTER_MODEL = 'google/gemini-2.5-flash';
+export const DEFAULT_CUSTOM_OPENAI_BASE_URL = 'http://localhost:11434/v1';
+export const DEFAULT_CUSTOM_OPENAI_MODEL = 'llama3.2';
 
 export interface AiModelPreset {
   id: string;
   name: string;
 }
 
+export interface CustomOpenAiPreset {
+  id: string;
+  name: string;
+  baseUrl: string;
+  defaultModel: string;
+  description: string;
+  keyRequired: boolean;
+  models: AiModelPreset[];
+}
+
+export const CUSTOM_OPENAI_PRESETS: CustomOpenAiPreset[] = [
+  {
+    id: 'ollama',
+    name: 'Ollama (Local)',
+    baseUrl: 'http://localhost:11434/v1',
+    defaultModel: 'llama3.2',
+    description: 'Local private models via Ollama. No API key needed.',
+    keyRequired: false,
+    models: [
+      { id: 'llama3.2', name: 'Llama 3.2' },
+      { id: 'llama3.1', name: 'Llama 3.1' },
+      { id: 'mistral', name: 'Mistral' },
+      { id: 'qwen2.5', name: 'Qwen 2.5' },
+      { id: 'deepseek-r1', name: 'DeepSeek R1' },
+      { id: 'phi4', name: 'Phi-4' },
+    ],
+  },
+  {
+    id: 'lmstudio',
+    name: 'LM Studio (Local)',
+    baseUrl: 'http://localhost:1234/v1',
+    defaultModel: 'local-model',
+    description: 'Local LM Studio developer server. No API key needed.',
+    keyRequired: false,
+    models: [
+      { id: 'local-model', name: 'Loaded Local Model' },
+    ],
+  },
+  {
+    id: 'groq',
+    name: 'Groq',
+    baseUrl: 'https://api.groq.com/openai/v1',
+    defaultModel: 'llama-3.3-70b-versatile',
+    description: 'Ultra-fast LPU inference with generous free quota.',
+    keyRequired: true,
+    models: [
+      { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B' },
+      { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B' },
+      { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B' },
+      { id: 'gemma2-9b-it', name: 'Gemma 2 9B' },
+    ],
+  },
+  {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    baseUrl: 'https://api.deepseek.com/v1',
+    defaultModel: 'deepseek-chat',
+    description: 'DeepSeek V3 & R1 OpenAI-compatible endpoint.',
+    keyRequired: true,
+    models: [
+      { id: 'deepseek-chat', name: 'DeepSeek V3' },
+      { id: 'deepseek-reasoner', name: 'DeepSeek R1' },
+    ],
+  },
+  {
+    id: 'together',
+    name: 'Together AI',
+    baseUrl: 'https://api.together.xyz/v1',
+    defaultModel: 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo',
+    description: 'Open-source models cloud endpoint.',
+    keyRequired: true,
+    models: [
+      { id: 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo', name: 'Llama 3.1 70B Turbo' },
+      { id: 'meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo', name: 'Llama 3.1 8B Turbo' },
+      { id: 'mistralai/Mixtral-8x7B-Instruct-v0.1', name: 'Mixtral 8x7B' },
+    ],
+  },
+  {
+    id: 'mistral',
+    name: 'Mistral AI',
+    baseUrl: 'https://api.mistral.ai/v1',
+    defaultModel: 'mistral-small-latest',
+    description: 'Direct official Mistral platform API.',
+    keyRequired: true,
+    models: [
+      { id: 'mistral-small-latest', name: 'Mistral Small' },
+      { id: 'mistral-large-latest', name: 'Mistral Large' },
+      { id: 'codestral-latest', name: 'Codestral' },
+    ],
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI (Official)',
+    baseUrl: 'https://api.openai.com/v1',
+    defaultModel: 'gpt-4o-mini',
+    description: 'Direct official OpenAI API.',
+    keyRequired: true,
+    models: [
+      { id: 'gpt-4o-mini', name: 'GPT-4o mini' },
+      { id: 'gpt-4o', name: 'GPT-4o' },
+      { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' },
+    ],
+  },
+];
+
 export const GEMINI_MODEL_PRESETS: AiModelPreset[] = [
-  { id: 'gemini-flash-lite-latest', name: 'Gemini Flash-Lite' },
-  { id: 'gemini-flash-latest', name: 'Gemini Flash' },
+  { id: 'gemini-flash-lite-latest', name: 'Flash-Lite' },
+  { id: 'gemini-flash-latest', name: 'Flash' },
   { id: 'gemma-4-26b-a4b-it', name: 'Gemma 4 26B' },
   { id: 'gemma-4-31b-it', name: 'Gemma 4 31B' },
 ];
 
 export const OPENROUTER_MODEL_PRESETS: AiModelPreset[] = [
   { id: 'liquid/lfm-2.5-2.6b:free', name: 'LFM 2.5' },
-  { id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', name: 'Nemotron 3 Nano Omni' },
-  { id: 'nvidia/nemotron-3.5-lightning:free', name: 'Nemotron 3.5 Lightning' },
+  { id: 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free', name: 'Nemotron 3 Nano' },
+  { id: 'nvidia/nemotron-3.5-lightning:free', name: 'Nemotron 3.5' },
   { id: 'nvidia/nemotron-3-super-120b-a12b:free', name: 'Nemotron 3 Super' },
   { id: 'nvidia/nemotron-3-ultra-550b-a55b:free', name: 'Nemotron 3 Ultra' },
   { id: 'thinkingmachines/inkling-small:free', name: 'Inkling Small' },
@@ -197,19 +304,37 @@ export interface UserPreferences {
   theme: 'light' | 'dark';
   accentColor: string; // e.g. '#80D141'
   accentColorName?: string;
-  aiProvider?: AiProvider; // 'gemini' | 'openrouter'
+  aiProvider?: AiProvider; // 'gemini' | 'openrouter' | 'custom'
   geminiApiKey?: string; // Custom user-entered Gemini API key
   geminiModel?: string; // Selected Gemini model ID
   openRouterApiKey?: string; // Custom user-entered OpenRouter API key
   openRouterModel?: string; // Selected OpenRouter model ID
+  customOpenAiBaseUrl?: string; // Custom OpenAI-compatible Base URL
+  customOpenAiApiKey?: string; // Custom user-entered API key (optional for local)
+  customOpenAiModel?: string; // Selected Model ID
+  customOpenAiApiVersion?: string; // Optional API version (e.g. for Azure)
   useSharedFreeKey?: boolean; // Whether the user uses the shared community free API key
   plannerCustomInstructions?: string; // Persistent custom instructions for smart planner
+}
+
+export function isLocalEndpoint(url?: string): boolean {
+  if (!url) return false;
+  return /localhost|127\.0\.0\.1|0\.0\.0\.0|::1|\.local\b/i.test(url);
 }
 
 export function hasActiveAiKey(prefs: UserPreferences): boolean {
   const provider: AiProvider = prefs.aiProvider || 'gemini';
   if (provider === 'openrouter') {
     return Boolean(prefs.openRouterApiKey && prefs.openRouterApiKey.trim() !== '');
+  }
+  if (provider === 'custom') {
+    const baseUrl = prefs.customOpenAiBaseUrl?.trim() || (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_OPENAI_COMPATIBLE_BASE_URL : '') || DEFAULT_CUSTOM_OPENAI_BASE_URL;
+    if (isLocalEndpoint(baseUrl)) {
+      // Local endpoints like Ollama or LM Studio don't require API keys
+      return true;
+    }
+    const key = prefs.customOpenAiApiKey?.trim() || (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_OPENAI_COMPATIBLE_API_KEY : '') || '';
+    return Boolean(key || baseUrl);
   }
   return Boolean(prefs.geminiApiKey && prefs.geminiApiKey.trim() !== '');
 }
