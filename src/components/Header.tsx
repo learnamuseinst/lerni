@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Dices, 
@@ -53,6 +54,18 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [internalShowEnergyModal, setInternalShowEnergyModal] = useState(false);
   const showEnergyModal = isStatusOpen !== undefined ? isStatusOpen : internalShowEnergyModal;
+
+  // Prevent background scroll while energy check-in modal is open
+  useEffect(() => {
+    if (showEnergyModal) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [showEnergyModal]);
+
   const handleOpenStatusModal = () => {
     if (onOpenStatus) {
       onOpenStatus();
@@ -84,7 +97,7 @@ export const Header: React.FC<HeaderProps> = ({
   const currentEnergyName = getEnergyLabel(prefs.currentEnergy);
 
   return (
-    <header className="w-full bg-[#EDF6E8] dark:bg-[#162014] border-b border-[#D8E8D0] dark:border-[#22301F] sticky top-0 z-30 transition-colors">
+    <header className={`w-full bg-[#EDF6E8] dark:bg-[#162014] border-b border-[#D8E8D0] dark:border-[#22301F] sticky top-0 ${showEnergyModal ? 'z-[60]' : 'z-30'} transition-colors`}>
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-3">
         
         {/* Brand & Mascot */}
@@ -172,18 +185,19 @@ export const Header: React.FC<HeaderProps> = ({
 
       </div>
 
-      {/* Full-Screen Status & Energy Check-in Window */}
-      <AnimatePresence>
-        {showEnergyModal && (
-          <motion.div 
-            id="status-window-fullscreen"
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ duration: 0.2 }}
-            dir={language === 'fa' ? 'rtl' : 'ltr'}
-            className="fixed inset-0 z-50 bg-[#F8FAF5] dark:bg-[#141C13] flex flex-col overflow-hidden text-start"
-          >
+      {/* Full-Screen Status & Energy Check-in Window (Portaled to document.body to stay above navigation bar) */}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {showEnergyModal && (
+            <motion.div 
+              id="status-window-fullscreen"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
+              dir={language === 'fa' ? 'rtl' : 'ltr'}
+              className="fixed inset-0 z-[60] bg-[#F8FAF5] dark:bg-[#141C13] flex flex-col overflow-hidden text-start"
+            >
             {/* Top Bar */}
             <div className="w-full bg-[#EDF6E8] dark:bg-[#182316] border-b border-[#D8E8D0] dark:border-[#263722] px-4 sm:px-8 py-3.5 flex items-center justify-between shrink-0 shadow-xs">
               <div className="flex items-center gap-3">
@@ -349,7 +363,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* Bottom Sticky Action Bar */}
-            <div className="w-full border-t border-[#D8E8D0] dark:border-[#263722] bg-[#EDF6E8]/95 dark:bg-[#182316]/95 backdrop-blur-md px-4 sm:px-8 py-3.5 flex items-center justify-between shrink-0">
+            <div className="w-full border-t border-[#D8E8D0] dark:border-[#263722] bg-[#EDF6E8]/95 dark:bg-[#182316]/95 backdrop-blur-md px-4 sm:px-8 pt-3.5 pb-[max(env(safe-area-inset-bottom),1rem)] flex items-center justify-between shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
               <div className="text-xs text-[#485B44] dark:text-[#9EB598] font-medium hidden sm:flex items-center gap-2">
                 <span>{currentEnergyMeta.icon}</span>
                 <span className="font-bold text-[#151E14] dark:text-[#E8F2E4]">{currentEnergyName}</span>
@@ -358,10 +372,11 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>{t((SENSORY_STATES.find(s => s.id === prefs.sensoryState)?.labelKey || 'sensory.balanced') as any)}</span>
               </div>
 
-              <div className="flex items-center gap-3 ms-auto">
+              <div className="flex items-center gap-3 ms-auto w-full sm:w-auto justify-end">
                 <button
+                  type="button"
                   onClick={handleCloseStatusModal}
-                  className="px-6 py-2.5 rounded-full bg-[#80D141] hover:bg-[#72BF36] text-[#0F2600] text-xs sm:text-sm font-bold shadow-md active:scale-95 transition-all"
+                  className="w-full sm:w-auto px-6 py-3 sm:py-2.5 rounded-full bg-[#80D141] hover:bg-[#72BF36] text-[#0F2600] text-sm font-bold shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {t('common.done', 'Apply & Close')}
                 </button>
@@ -369,7 +384,9 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </motion.div>
         )}
-      </AnimatePresence>
-    </header>
+      </AnimatePresence>,
+      document.body
+    )}
+  </header>
   );
 };

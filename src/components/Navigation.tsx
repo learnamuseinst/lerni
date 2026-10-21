@@ -111,7 +111,7 @@ export const Navigation: React.FC<NavigationProps> = ({
          ========================================================================= */}
       <div 
         id="mobile-navigation-wrapper"
-        className="md:hidden fixed bottom-0 inset-x-0 z-30 w-full"
+        className="md:hidden fixed bottom-0 inset-x-0 z-20 w-full"
       >
         <nav 
           id="m3-mobile-navigation-bar"

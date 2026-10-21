@@ -44,6 +44,8 @@ import {
   Server,
   Layers,
   Cpu,
+  ChevronDown,
+  ChevronsUpDown,
 } from 'lucide-react';
 import {
   UserPreferences,
@@ -203,6 +205,42 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   const [copiedResponse, setCopiedResponse] = useState(false);
 
   const selectedProvider: AiProvider = draftPrefs.aiProvider || prefs.aiProvider || 'gemini';
+
+  // Section accordion state: track which sections are expanded
+  // Expandable sections state - keeps the settings clean and uncluttered
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    language: true,
+    theme: false,
+    ai: true,
+    planner: false,
+    navigation: false,
+    focus: false,
+    categories: false,
+    audio: false,
+    backup: false,
+  });
+
+  const toggleSection = (id: string) => {
+    soundEngine.playPop();
+    setExpandedSections((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const allExpanded = Object.values(expandedSections).every(Boolean);
+  const toggleAllSections = () => {
+    soundEngine.playPop();
+    const nextState = !allExpanded;
+    setExpandedSections({
+      language: nextState,
+      theme: nextState,
+      ai: nextState,
+      planner: nextState,
+      navigation: nextState,
+      focus: nextState,
+      categories: nextState,
+      audio: nextState,
+      backup: nextState,
+    });
+  };
 
   // Smart Planner Custom Instructions state
   const [plannerInstructionsInput, setPlannerInstructionsInput] = useState(prefs.plannerCustomInstructions || '');
@@ -815,16 +853,28 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
           </div>
         )}
 
-        {/* Title and Mascot on the line below (subtitle removed) */}
-        <div className="flex items-center gap-3.5 pt-1">
-          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center p-1.5 shadow-xs shrink-0">
-            <LerniMascot pose="waving" size="xs" interactive={false} />
+        {/* Title and Mascot on the line below with Expand/Collapse toggle */}
+        <div className="flex items-center justify-between gap-3 pt-1 flex-wrap">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center p-1.5 shadow-xs shrink-0">
+              <LerniMascot pose="waving" size="xs" interactive={false} />
+            </div>
+            <div>
+              <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-[#151E14] dark:text-[#E8F2E4]">
+                {t('settings.title', 'Settings & Preferences')}
+              </h2>
+            </div>
           </div>
-          <div>
-            <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-[#151E14] dark:text-[#E8F2E4]">
-              {t('settings.title', 'Settings & Preferences')}
-            </h2>
-          </div>
+
+          <button
+            type="button"
+            onClick={toggleAllSections}
+            className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-[#3B7E10] dark:text-[#80D141] bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] dark:hover:bg-[#283A23] border border-[#D8E8D0] dark:border-[#273722] flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+            title={allExpanded ? (isDraftFa ? 'بستن همه بخش‌ها' : 'Collapse All Sections') : (isDraftFa ? 'باز کردن همه بخش‌ها' : 'Expand All Sections')}
+          >
+            <ChevronsUpDown className="w-3.5 h-3.5" />
+            <span>{allExpanded ? (isDraftFa ? 'بستن همه' : 'Collapse All') : (isDraftFa ? 'باز کردن همه' : 'Expand All')}</span>
+          </button>
         </div>
       </div>
 
@@ -835,101 +885,235 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
         <div className="lg:col-span-7 space-y-6">
           
           {/* Multilingual Selection (English & Persian RTL) */}
-          <section id="section-settings-language" className="p-5 sm:p-6 rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center text-[#234A00] dark:text-[#80D141]">
+          <section id="section-settings-language" className="rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm transition-all duration-200 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => toggleSection('language')}
+              aria-expanded={expandedSections['language']}
+              className="w-full p-4 sm:p-5 flex items-center justify-between text-start gap-3 hover:bg-[#F9FAF6] dark:hover:bg-[#1C2819] transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center text-[#234A00] dark:text-[#80D141] shrink-0 group-hover:scale-105 transition-transform">
                   <Globe className="w-4 h-4" />
                 </div>
-                <div>
-                  <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
-                    {t('settings.languageSection', 'Language & Direction')}
-                  </h3>
-                  <p className="text-xs text-[#485B44] dark:text-[#9EB598]">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                      {t('settings.languageSection', 'Language & Direction')}
+                    </h3>
+                    <span className="text-[11px] font-semibold text-[#3B7E10] dark:text-[#80D141] px-2 py-0.5 rounded-full bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/30">
+                      {selectedLanguage === 'fa' ? 'فارسی (RTL)' : 'English (LTR)'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#485B44] dark:text-[#9EB598] truncate">
                     {t('settings.languageDesc', 'Select your preferred interface language')}
                   </p>
                 </div>
               </div>
-            </div>
 
-            {/* Language Toggle Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              {/* English (LTR) */}
-              <button
-                id="btn-lang-en"
-                type="button"
-                onClick={() => handleLanguageChange('en')}
-                className={`p-4 rounded-2xl flex items-center justify-between border transition-all text-start cursor-pointer ${
-                  selectedLanguage === 'en'
-                    ? 'bg-[#80D141]/15 dark:bg-[#80D141]/20 border-[#80D141] shadow-xs ring-1 ring-[#80D141]'
-                    : 'bg-[#F7FAF4] dark:bg-[#1C2919] text-[#485B44] dark:text-[#9EB598] border-[#DCEAD4] dark:border-[#2A3E26] hover:bg-[#E2F5D1]'
-                }`}
-              >
-                <div>
-                  <div className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4]">
-                    English
-                  </div>
-                  <div className="text-[10px] text-[#485B44] dark:text-[#9EB598]">
-                    Left-to-Right (LTR)
-                  </div>
-                </div>
-                {selectedLanguage === 'en' && (
-                  <div className="w-6 h-6 rounded-full bg-[#80D141] text-[#0F2600] flex items-center justify-center">
-                    <Check className="w-3.5 h-3.5 stroke-[3]" />
-                  </div>
-                )}
-              </button>
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-[#485B44] dark:text-[#9EB598] group-hover:text-[#151E14] dark:group-hover:text-[#E8F2E4] group-hover:bg-[#EDF6E8] dark:group-hover:bg-[#202E1E] transition-colors shrink-0">
+                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expandedSections['language'] ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
 
-              {/* Persian (RTL) */}
-              <button
-                id="btn-lang-fa"
-                type="button"
-                onClick={() => handleLanguageChange('fa')}
-                className={`p-4 rounded-2xl flex items-center justify-between border transition-all text-start cursor-pointer ${
-                  selectedLanguage === 'fa'
-                    ? 'bg-[#80D141]/15 dark:bg-[#80D141]/20 border-[#80D141] shadow-xs ring-1 ring-[#80D141]'
-                    : 'bg-[#F7FAF4] dark:bg-[#1C2919] text-[#485B44] dark:text-[#9EB598] border-[#DCEAD4] dark:border-[#2A3E26] hover:bg-[#E2F5D1]'
-                }`}
-              >
-                <div>
-                  <div className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4]">
-                    فارسی (Persian)
+            <AnimatePresence initial={false}>
+              {expandedSections['language'] && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22, ease: 'easeInOut' }}
+                >
+                  <div className="px-5 pb-5 sm:px-6 sm:pb-6 pt-2 border-t border-[#DCEAD4]/80 dark:border-[#263722] space-y-4">
+                    {/* Language Toggle Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      {/* English (LTR) */}
+                      <button
+                        id="btn-lang-en"
+                        type="button"
+                        onClick={() => handleLanguageChange('en')}
+                        className={`p-4 rounded-2xl flex items-center justify-between border transition-all text-start cursor-pointer ${
+                          selectedLanguage === 'en'
+                            ? 'bg-[#80D141]/15 dark:bg-[#80D141]/20 border-[#80D141] shadow-xs ring-1 ring-[#80D141]'
+                            : 'bg-[#F7FAF4] dark:bg-[#1C2919] text-[#485B44] dark:text-[#9EB598] border-[#DCEAD4] dark:border-[#2A3E26] hover:bg-[#E2F5D1]'
+                        }`}
+                      >
+                        <div>
+                          <div className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                            English
+                          </div>
+                          <div className="text-[10px] text-[#485B44] dark:text-[#9EB598]">
+                            Left-to-Right (LTR)
+                          </div>
+                        </div>
+                        {selectedLanguage === 'en' && (
+                          <div className="w-6 h-6 rounded-full bg-[#80D141] text-[#0F2600] flex items-center justify-center">
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          </div>
+                        )}
+                      </button>
+
+                      {/* Persian (RTL) */}
+                      <button
+                        id="btn-lang-fa"
+                        type="button"
+                        onClick={() => handleLanguageChange('fa')}
+                        className={`p-4 rounded-2xl flex items-center justify-between border transition-all text-start cursor-pointer ${
+                          selectedLanguage === 'fa'
+                            ? 'bg-[#80D141]/15 dark:bg-[#80D141]/20 border-[#80D141] shadow-xs ring-1 ring-[#80D141]'
+                            : 'bg-[#F7FAF4] dark:bg-[#1C2919] text-[#485B44] dark:text-[#9EB598] border-[#DCEAD4] dark:border-[#2A3E26] hover:bg-[#E2F5D1]'
+                        }`}
+                      >
+                        <div>
+                          <div className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                            فارسی (Persian)
+                          </div>
+                          <div className="text-[10px] text-[#485B44] dark:text-[#9EB598]">
+                            راست‌به‌چپ (RTL)
+                          </div>
+                        </div>
+                        {selectedLanguage === 'fa' && (
+                          <div className="w-6 h-6 rounded-full bg-[#80D141] text-[#0F2600] flex items-center justify-center">
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          </div>
+                        )}
+                      </button>
+                    </div>
                   </div>
-                  <div className="text-[10px] text-[#485B44] dark:text-[#9EB598]">
-                    راست‌به‌چپ (RTL)
-                  </div>
-                </div>
-                {selectedLanguage === 'fa' && (
-                  <div className="w-6 h-6 rounded-full bg-[#80D141] text-[#0F2600] flex items-center justify-center">
-                    <Check className="w-3.5 h-3.5 stroke-[3]" />
-                  </div>
-                )}
-              </button>
-            </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </section>
-          
-          {/* Feature: AI Provider & API Key Configuration */}
-          <section id="section-settings-gemini" className="p-5 sm:p-6 rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm space-y-4">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center text-[#234A00] dark:text-[#80D141]">
-                  <Sparkles className="w-4 h-4" />
+
+          {/* Theme & Visuals (Expandable) */}
+          <section id="section-settings-theme" className="rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm transition-all duration-200 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => toggleSection('theme')}
+              aria-expanded={expandedSections['theme']}
+              className="w-full p-4 sm:p-5 flex items-center justify-between text-start gap-3 hover:bg-[#F9FAF6] dark:hover:bg-[#1C2819] transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center text-[#234A00] dark:text-[#80D141] shrink-0 group-hover:scale-105 transition-transform">
+                  {draftPrefs.theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
-                      {t('settings.geminiSection', 'AI Provider & API Key')}
+                      {t('settings.themeSection', 'Visual Theme')}
                     </h3>
+                    <span className="text-[11px] font-semibold text-[#3B7E10] dark:text-[#80D141] px-2 py-0.5 rounded-full bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/30">
+                      {draftPrefs.theme === 'dark' ? (isDraftFa ? 'تیره جنگلی' : 'Forest Dark') : (isDraftFa ? 'روشن ملایم' : 'Gentle Light')}
+                    </span>
                   </div>
-                  <p className="text-xs text-[#485B44] dark:text-[#9EB598]">
-                    {t('settings.geminiDesc', 'Configure Google Gemini or OpenRouter for smart scheduling & task breakdown')}
+                  <p className="text-xs text-[#485B44] dark:text-[#9EB598] truncate">
+                    {t('settings.themeDesc', 'Eye-safe Forest Dark or Gentle Light')}
                   </p>
                 </div>
               </div>
-            </div>
 
-            {/* AI Provider Selector Tabs */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-[#485B44] dark:text-[#9EB598] group-hover:text-[#151E14] dark:group-hover:text-[#E8F2E4] group-hover:bg-[#EDF6E8] dark:group-hover:bg-[#202E1E] transition-colors shrink-0">
+                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expandedSections['theme'] ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            <AnimatePresence initial={false}>
+              {expandedSections['theme'] && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22, ease: 'easeInOut' }}
+                >
+                  <div className="px-5 pb-5 sm:px-6 sm:pb-6 pt-2 border-t border-[#DCEAD4]/80 dark:border-[#263722] space-y-4">
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDraftPrefs((prev) => ({ ...prev, theme: 'dark' }));
+                          onUpdatePrefs({ theme: 'dark' });
+                          soundEngine.playPop();
+                        }}
+                        className={`py-3 px-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border transition-all cursor-pointer ${
+                          draftPrefs.theme === 'dark'
+                            ? 'bg-[#80D141] text-[#0F2600] border-[#80D141] shadow-xs'
+                            : 'bg-[#F7FAF4] dark:bg-[#1C2919] text-[#485B44] dark:text-[#9EB598] border-[#DCEAD4] dark:border-[#2A3E26] hover:bg-[#E2F5D1]'
+                        }`}
+                      >
+                        <Moon className="w-4 h-4" />
+                        <span>{t('settings.themeDark', 'Forest Dark')}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDraftPrefs((prev) => ({ ...prev, theme: 'light' }));
+                          onUpdatePrefs({ theme: 'light' });
+                          soundEngine.playPop();
+                        }}
+                        className={`py-3 px-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border transition-all cursor-pointer ${
+                          draftPrefs.theme === 'light'
+                            ? 'bg-[#80D141] text-[#0F2600] border-[#80D141] shadow-xs'
+                            : 'bg-[#F7FAF4] dark:bg-[#1C2919] text-[#485B44] dark:text-[#9EB598] border-[#DCEAD4] dark:border-[#2A3E26] hover:bg-[#E2F5D1]'
+                        }`}
+                      >
+                        <Sun className="w-4 h-4" />
+                        <span>{t('settings.themeLight', 'Gentle Light')}</span>
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </section>
+          
+          {/* Feature: AI Provider & API Key Configuration */}
+          <section id="section-settings-gemini" className="rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm transition-all duration-200 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => toggleSection('ai')}
+              aria-expanded={expandedSections['ai']}
+              className="w-full p-4 sm:p-5 flex items-center justify-between text-start gap-3 hover:bg-[#F9FAF6] dark:hover:bg-[#1C2819] transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center text-[#234A00] dark:text-[#80D141] shrink-0 group-hover:scale-105 transition-transform">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                      {t('settings.geminiSection', 'AI Provider & API Key')}
+                    </h3>
+                    <span className="text-[11px] font-semibold text-[#3B7E10] dark:text-[#80D141] px-2 py-0.5 rounded-full bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/30">
+                      {selectedProvider === 'custom'
+                        ? (customModelInput ? `Custom · ${customModelInput}` : 'Custom (OpenAI)')
+                        : selectedProvider === 'openrouter'
+                        ? `OpenRouter · ${openRouterModelInput ? openRouterModelInput.split('/')[1] || openRouterModelInput : 'Default'}`
+                        : `Gemini · ${geminiModelInput ? geminiModelInput.replace('gemini-', '') : 'Flash'}`}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#485B44] dark:text-[#9EB598] truncate">
+                    {t('settings.geminiDesc', 'Configure Google Gemini, OpenRouter, or Custom OpenAI API')}
+                  </p>
+                </div>
+              </div>
+
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-[#485B44] dark:text-[#9EB598] group-hover:text-[#151E14] dark:group-hover:text-[#E8F2E4] group-hover:bg-[#EDF6E8] dark:group-hover:bg-[#202E1E] transition-colors shrink-0">
+                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expandedSections['ai'] ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            <AnimatePresence initial={false}>
+              {expandedSections['ai'] && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22, ease: 'easeInOut' }}
+                >
+                  <div className="px-5 pb-5 sm:px-6 sm:pb-6 pt-2 border-t border-[#DCEAD4]/80 dark:border-[#263722] space-y-4">
+                    {/* AI Provider Selector Tabs */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <button
                 id="btn-provider-gemini"
                 type="button"
@@ -1696,675 +1880,802 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                 </div>
               </div>
             </div>
-          </section>
-
-          {/* Smart Planner Custom Instructions Section */}
-          <section id="section-settings-planner-instructions" className="p-5 sm:p-6 rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center text-[#234A00] dark:text-[#80D141]">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
-                    {t('settings.plannerInstructionsSection', 'Smart Planner Custom Instructions')}
-                  </h3>
-                  <p className="text-xs text-[#485B44] dark:text-[#9EB598]">
-                    {t('settings.plannerInstructionsDesc', 'Persistent rules & preferences for how AI structures your daily schedules')}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <form onSubmit={handleSavePlannerInstructions} className="space-y-3 pt-1">
-              <div className="space-y-1.5">
-                <textarea
-                  value={plannerInstructionsInput}
-                  onChange={(e) => setPlannerInstructionsInput(e.target.value)}
-                  placeholder={t('settings.plannerInstructionsPlaceholder', 'e.g., Never schedule deep work after 4 PM; Always add 15min rest after meetings; Group errands together in the morning...')}
-                  rows={4}
-                  className="w-full p-3.5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] text-xs text-[#151E14] dark:text-[#E8F2E4] placeholder:text-[#79747E] dark:placeholder:text-[#7D917A] focus:outline-none focus:ring-2 focus:ring-[#80D141] resize-none transition-all leading-relaxed"
-                />
-              </div>
-
-              {/* Example suggestions chips */}
-              <div className="flex flex-wrap gap-1.5 items-center">
-                <span className="text-[10px] font-bold text-[#485B44] dark:text-[#9EB598]">
-                  {isDraftFa ? 'پیشنهادهای سریع:' : 'Quick ideas:'}
-                </span>
-                {[
-                  isDraftFa ? '🚫 بعد از ساعت ۵ عصر کار سنگین نگذار' : '🚫 No heavy work after 5 PM',
-                  isDraftFa ? '☕ بعد از هر کار فکری ۱۰ دقیقه استراحت بده' : '☕ 10min buffer between focus blocks',
-                  isDraftFa ? '🏃 کارهای حرکتی را اول صبح قرار بده' : '🏃 Put physical tasks in morning',
-                ].map((idea) => (
-                  <button
-                    key={idea}
-                    type="button"
-                    onClick={() => {
-                      soundEngine.playPop();
-                      setPlannerInstructionsInput((prev) => {
-                        const trimmed = prev.trim();
-                        return trimmed ? `${trimmed}\n${idea}` : idea;
-                      });
-                    }}
-                    className="text-[10px] px-2.5 py-1 rounded-lg bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] text-[#2F6B12] dark:text-[#9DD97A] border border-[#DCEAD4] dark:border-[#2C4027] font-medium transition-colors cursor-pointer"
-                  >
-                    {idea}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="submit"
-                    disabled={plannerInstructionsInput.trim() === (draftPrefs.plannerCustomInstructions || '')}
-                    className="px-4 py-2 rounded-xl bg-[#80D141] hover:bg-[#72BF36] disabled:opacity-40 text-[#0F2600] text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    <span>{t('settings.saveInstructions', 'Save Instructions')}</span>
-                  </button>
-
-                  {(plannerInstructionsInput || draftPrefs.plannerCustomInstructions) && (
-                    <button
-                      type="button"
-                      onClick={handleClearPlannerInstructions}
-                      className="px-3 py-2 rounded-xl bg-white dark:bg-[#22301F] text-[#B3261E] dark:text-[#F2B8B5] hover:bg-[#FFEAEA] dark:hover:bg-[#3B1C1A] text-xs font-bold border border-[#DCEAD4] dark:border-[#33482E] transition-all cursor-pointer"
-                    >
-                      {isDraftFa ? 'پاک کردن' : 'Clear'}
-                    </button>
-                  )}
-                </div>
-
-                <span className="text-[11px] text-[#485B44] dark:text-[#9EB598]">
-                  {isDraftFa ? 'در تمام برنامه‌ریزی‌های هوشمند اعمال می‌شود' : 'Applied across all AI schedules'}
-                </span>
-              </div>
-            </form>
-
-            <AnimatePresence>
-              {instructionsSavedMessage && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  className="p-2.5 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 text-xs font-bold text-[#1C3700] dark:text-[#80D141] flex items-center gap-2"
-                >
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>{instructionsSavedMessage}</span>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </section>
 
+          {/* Smart Planner Custom Instructions Section */}
+          <section id="section-settings-planner-instructions" className="rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm transition-all duration-200 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => toggleSection('planner')}
+              aria-expanded={expandedSections['planner']}
+              className="w-full p-4 sm:p-5 flex items-center justify-between text-start gap-3 hover:bg-[#F9FAF6] dark:hover:bg-[#1C2819] transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center text-[#234A00] dark:text-[#80D141] shrink-0 group-hover:scale-105 transition-transform">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                      {t('settings.plannerInstructionsSection', 'Smart Planner Custom Instructions')}
+                    </h3>
+                    <span className="text-[11px] font-semibold text-[#3B7E10] dark:text-[#80D141] px-2 py-0.5 rounded-full bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/30">
+                      {plannerInstructionsInput.trim() ? (isDraftFa ? 'سفارشی فعال' : 'Custom Rules Active') : (isDraftFa ? 'پیش‌فرض' : 'Default Rules')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#485B44] dark:text-[#9EB598] truncate">
+                    {t('settings.plannerInstructionsDesc', 'Persistent rules & preferences for how AI structures your daily schedules')}
+                  </p>
+                </div>
+              </div>
+
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-[#485B44] dark:text-[#9EB598] group-hover:text-[#151E14] dark:group-hover:text-[#E8F2E4] group-hover:bg-[#EDF6E8] dark:group-hover:bg-[#202E1E] transition-colors shrink-0">
+                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expandedSections['planner'] ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            <AnimatePresence initial={false}>
+              {expandedSections['planner'] && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22, ease: 'easeInOut' }}
+                >
+                  <div className="px-5 pb-5 sm:px-6 sm:pb-6 pt-2 border-t border-[#DCEAD4]/80 dark:border-[#263722] space-y-4">
+                    <form onSubmit={handleSavePlannerInstructions} className="space-y-3 pt-1">
+                      <div className="space-y-1.5">
+                        <textarea
+                          value={plannerInstructionsInput}
+                          onChange={(e) => setPlannerInstructionsInput(e.target.value)}
+                          placeholder={t('settings.plannerInstructionsPlaceholder', 'e.g., Never schedule deep work after 4 PM; Always add 15min rest after meetings; Group errands together in the morning...')}
+                          rows={4}
+                          className="w-full p-3.5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] text-xs text-[#151E14] dark:text-[#E8F2E4] placeholder:text-[#79747E] dark:placeholder:text-[#7D917A] focus:outline-none focus:ring-2 focus:ring-[#80D141] resize-none transition-all leading-relaxed"
+                        />
+                      </div>
+
+                      {/* Example suggestions chips */}
+                      <div className="flex flex-wrap gap-1.5 items-center">
+                        <span className="text-[10px] font-bold text-[#485B44] dark:text-[#9EB598]">
+                          {isDraftFa ? 'پیشنهادهای سریع:' : 'Quick ideas:'}
+                        </span>
+                        {[
+                          isDraftFa ? '🚫 بعد از ساعت ۵ عصر کار سنگین نگذار' : '🚫 No heavy work after 5 PM',
+                          isDraftFa ? '☕ بعد از هر کار فکری ۱۰ دقیقه استراحت بده' : '☕ 10min buffer between focus blocks',
+                          isDraftFa ? '🏃 کارهای حرکتی را اول صبح قرار بده' : '🏃 Put physical tasks in morning',
+                        ].map((idea) => (
+                          <button
+                            key={idea}
+                            type="button"
+                            onClick={() => {
+                              soundEngine.playPop();
+                              setPlannerInstructionsInput((prev) => {
+                                const trimmed = prev.trim();
+                                return trimmed ? `${trimmed}\n${idea}` : idea;
+                              });
+                            }}
+                            className="text-[10px] px-2.5 py-1 rounded-lg bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] text-[#2F6B12] dark:text-[#9DD97A] border border-[#DCEAD4] dark:border-[#2C4027] font-medium transition-colors cursor-pointer"
+                          >
+                            {idea}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="submit"
+                            disabled={plannerInstructionsInput.trim() === (draftPrefs.plannerCustomInstructions || '')}
+                            className="px-4 py-2 rounded-xl bg-[#80D141] hover:bg-[#72BF36] disabled:opacity-40 text-[#0F2600] text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <Save className="w-3.5 h-3.5" />
+                            <span>{t('settings.saveInstructions', 'Save Instructions')}</span>
+                          </button>
+
+                          {(plannerInstructionsInput || draftPrefs.plannerCustomInstructions) && (
+                            <button
+                              type="button"
+                              onClick={handleClearPlannerInstructions}
+                              className="px-3 py-2 rounded-xl bg-white dark:bg-[#22301F] text-[#B3261E] dark:text-[#F2B8B5] hover:bg-[#FFEAEA] dark:hover:bg-[#3B1C1A] text-xs font-bold border border-[#DCEAD4] dark:border-[#33482E] transition-all cursor-pointer"
+                            >
+                              {isDraftFa ? 'پاک کردن' : 'Clear'}
+                            </button>
+                          )}
+                        </div>
+
+                        <span className="text-[11px] text-[#485B44] dark:text-[#9EB598]">
+                          {isDraftFa ? 'در تمام برنامه‌ریزی‌های هوشمند اعمال می‌شود' : 'Applied across all AI schedules'}
+                        </span>
+                      </div>
+                    </form>
+
+                    <AnimatePresence>
+                      {instructionsSavedMessage && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -6 }}
+                          className="p-2.5 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 text-xs font-bold text-[#1C3700] dark:text-[#80D141] flex items-center gap-2"
+                        >
+                          <CheckCircle2 className="w-4 h-4 shrink-0" />
+                          <span>{instructionsSavedMessage}</span>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </section>
+        </div>
+
+        {/* Right Column: Workflows, Categories, Audio & Data Management */}
+        <div className="lg:col-span-5 space-y-6">
           {/* Feature 1: Reorder Navigation Sections */}
-          <section id="section-settings-navigation" className="p-5 sm:p-6 rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center text-[#234A00] dark:text-[#80D141]">
+          <section id="section-settings-navigation" className="rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm transition-all duration-200 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => toggleSection('navigation')}
+              aria-expanded={expandedSections['navigation']}
+              className="w-full p-4 sm:p-5 flex items-center justify-between text-start gap-3 hover:bg-[#F9FAF6] dark:hover:bg-[#1C2819] transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center text-[#234A00] dark:text-[#80D141] shrink-0 group-hover:scale-105 transition-transform">
                   <Sliders className="w-4 h-4" />
                 </div>
-                <div>
-                  <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
-                    {t('settings.navOrderSection', 'Navigation Section Order')}
-                  </h3>
-                  <p className="text-xs text-[#485B44] dark:text-[#9EB598]">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                      {t('settings.navOrderSection', 'Navigation Section Order')}
+                    </h3>
+                    <span className="text-[11px] font-semibold text-[#3B7E10] dark:text-[#80D141] px-2 py-0.5 rounded-full bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/30">
+                      {isDraftFa ? `${currentNavOrder.length} بخش` : `${currentNavOrder.length} tabs`}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#485B44] dark:text-[#9EB598] truncate">
                     {t('settings.navOrderDesc', 'Reorder tabs in the navigation bar')}
                   </p>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleResetNavOrder}
-                className="px-3 py-1.5 rounded-full text-xs font-bold text-[#3B7E10] dark:text-[#80D141] bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] dark:hover:bg-[#283A23] border border-[#D8E8D0] dark:border-[#273722] flex items-center gap-1.5 transition-colors"
-                title={t('settings.resetNavOrder', 'Reset Order')}
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>{t('settings.resetNavOrder', 'Reset Order')}</span>
-              </button>
-            </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleResetNavOrder();
+                  }}
+                  className="px-2.5 py-1 rounded-full text-xs font-bold text-[#3B7E10] dark:text-[#80D141] bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] dark:hover:bg-[#283A23] border border-[#D8E8D0] dark:border-[#273722] flex items-center gap-1 transition-colors cursor-pointer"
+                  title={t('settings.resetNavOrder', 'Reset Order')}
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span className="hidden sm:inline">{t('settings.resetNavOrder', 'Reset Order')}</span>
+                </button>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-[#485B44] dark:text-[#9EB598] group-hover:text-[#151E14] dark:group-hover:text-[#E8F2E4] group-hover:bg-[#EDF6E8] dark:group-hover:bg-[#202E1E] transition-colors">
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expandedSections['navigation'] ? 'rotate-180' : ''}`} />
+                </div>
+              </div>
+            </button>
 
-            {/* Interactive Reordering List */}
-            <div className="space-y-2 pt-1">
-              {currentNavOrder.map((secId, index) => {
-                const icon = SECTION_ICONS[secId];
-                const label = t(`nav.${secId}`, secId);
-                const isFirst = index === 0;
-                const isLast = index === currentNavOrder.length - 1;
+            <AnimatePresence initial={false}>
+              {expandedSections['navigation'] && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22, ease: 'easeInOut' }}
+                >
+                  <div className="px-5 pb-5 sm:px-6 sm:pb-6 pt-2 border-t border-[#DCEAD4]/80 dark:border-[#263722] space-y-4">
+                    {/* Interactive Reordering List */}
+                    <div className="space-y-2 pt-1">
+                      {currentNavOrder.map((secId, index) => {
+                        const icon = SECTION_ICONS[secId];
+                        const label = t(`nav.${secId}`, secId);
+                        const isFirst = index === 0;
+                        const isLast = index === currentNavOrder.length - 1;
 
-                return (
-                  <motion.div
-                    key={secId}
-                    layout
-                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                    className="flex items-center justify-between p-3 sm:p-3.5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] hover:border-[#80D141]/60 transition-colors group"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      {/* Position Number */}
-                      <span className="w-6 h-6 rounded-full bg-white dark:bg-[#263722] border border-[#DCEAD4] dark:border-[#344D2F] flex items-center justify-center text-xs font-bold text-[#485B44] dark:text-[#9EB598] shrink-0">
-                        {isDraftFa ? (index + 1).toLocaleString('fa-IR') : index + 1}
-                      </span>
+                        return (
+                          <motion.div
+                            key={secId}
+                            layout
+                            transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                            className="flex items-center justify-between p-3 sm:p-3.5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] hover:border-[#80D141]/60 transition-colors group"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              {/* Position Number */}
+                              <span className="w-6 h-6 rounded-full bg-white dark:bg-[#263722] border border-[#DCEAD4] dark:border-[#344D2F] flex items-center justify-center text-xs font-bold text-[#485B44] dark:text-[#9EB598] shrink-0">
+                                {isDraftFa ? (index + 1).toLocaleString('fa-IR') : index + 1}
+                              </span>
 
-                      {/* Icon */}
-                      <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1E4300] dark:text-[#80D141] flex items-center justify-center shrink-0">
-                        {icon}
-                      </div>
+                              {/* Icon */}
+                              <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1E4300] dark:text-[#80D141] flex items-center justify-center shrink-0">
+                                {icon}
+                              </div>
 
-                      {/* Section Name */}
-                      <h4 className="font-bold text-sm text-[#151E14] dark:text-[#E8F2E4] truncate">
-                        {label}
-                      </h4>
+                              {/* Section Name */}
+                              <h4 className="font-bold text-sm text-[#151E14] dark:text-[#E8F2E4] truncate">
+                                {label}
+                              </h4>
+                            </div>
+
+                            {/* Reorder Buttons (Move Up / Move Down) */}
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleMoveNavSection(index, 'up')}
+                                disabled={isFirst}
+                                aria-label={`Move ${label} Up`}
+                                className="p-2 rounded-xl bg-white dark:bg-[#263722] border border-[#DCEAD4] dark:border-[#33482E] text-[#485B44] dark:text-[#9EB598] hover:text-[#151E14] dark:hover:text-[#E8F2E4] hover:bg-[#E2F2D9] dark:hover:bg-[#2E4229] disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90 cursor-pointer"
+                                title="Move Up"
+                              >
+                                <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleMoveNavSection(index, 'down')}
+                                disabled={isLast}
+                                aria-label={`Move ${label} Down`}
+                                className="p-2 rounded-xl bg-white dark:bg-[#263722] border border-[#DCEAD4] dark:border-[#33482E] text-[#485B44] dark:text-[#9EB598] hover:text-[#151E14] dark:hover:text-[#E8F2E4] hover:bg-[#E2F2D9] dark:hover:bg-[#2E4229] disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90 cursor-pointer"
+                                title="Move Down"
+                              >
+                                <ArrowDown className="w-4 h-4 stroke-[2.5]" />
+                              </button>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
                     </div>
-
-                    {/* Reorder Buttons (Move Up / Move Down) */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => handleMoveNavSection(index, 'up')}
-                        disabled={isFirst}
-                        aria-label={`Move ${label} Up`}
-                        className="p-2 rounded-xl bg-white dark:bg-[#263722] border border-[#DCEAD4] dark:border-[#33482E] text-[#485B44] dark:text-[#9EB598] hover:text-[#151E14] dark:hover:text-[#E8F2E4] hover:bg-[#E2F2D9] dark:hover:bg-[#2E4229] disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90 cursor-pointer"
-                        title="Move Up"
-                      >
-                        <ArrowUp className="w-4 h-4 stroke-[2.5]" />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleMoveNavSection(index, 'down')}
-                        disabled={isLast}
-                        aria-label={`Move ${label} Down`}
-                        className="p-2 rounded-xl bg-white dark:bg-[#263722] border border-[#DCEAD4] dark:border-[#33482E] text-[#485B44] dark:text-[#9EB598] hover:text-[#151E14] dark:hover:text-[#E8F2E4] hover:bg-[#E2F2D9] dark:hover:bg-[#2E4229] disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90 cursor-pointer"
-                        title="Move Down"
-                      >
-                        <ArrowDown className="w-4 h-4 stroke-[2.5]" />
-                      </button>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </section>
 
-          {/* Feature: Timer Tabs Reordering (Focus vs Tracker) */}
-          <section className="p-5 sm:p-6 rounded-[28px] bg-white dark:bg-[#162114] border border-[#DCEAD4] dark:border-[#22301F] shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1E4300] dark:text-[#80D141] flex items-center justify-center">
+          {/* Feature: Timer Tabs Reordering (Focus vs Tracker - Expandable) */}
+          <section id="section-settings-timer-tabs" className="rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm transition-all duration-200 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => toggleSection('focus')}
+              aria-expanded={expandedSections['focus']}
+              className="w-full p-4 sm:p-5 flex items-center justify-between text-start gap-3 hover:bg-[#F9FAF6] dark:hover:bg-[#1C2819] transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center text-[#234A00] dark:text-[#80D141] shrink-0 group-hover:scale-105 transition-transform">
                   <Timer className="w-4 h-4" />
                 </div>
-                <div>
-                  <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
-                    {t('settings.timerTabOrderSection', 'Timer Tabs Order')}
-                  </h3>
-                  <p className="text-xs text-[#485B44] dark:text-[#9EB598]">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                      {t('settings.timerTabOrderSection', 'Timer Tabs Order')}
+                    </h3>
+                    <span className="text-[11px] font-semibold text-[#3B7E10] dark:text-[#80D141] px-2 py-0.5 rounded-full bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/30">
+                      {currentFocusTabOrder[0] === 'focus' ? (isDraftFa ? 'تمرکز اول' : 'Focus First') : (isDraftFa ? 'ردیاب اول' : 'Tracker First')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#485B44] dark:text-[#9EB598] truncate">
                     {t('settings.timerTabOrderDesc', 'Reorder Focus and Tracker in the Timer section')}
                   </p>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleResetTimerTabOrder}
-                className="px-3 py-1.5 rounded-full text-xs font-bold text-[#3B7E10] dark:text-[#80D141] bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] dark:hover:bg-[#283A23] border border-[#D8E8D0] dark:border-[#273722] flex items-center gap-1.5 transition-colors cursor-pointer"
-                title={t('settings.resetTimerTabOrder', 'Reset Tabs Order')}
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>{t('settings.resetNavOrder', 'Reset Order')}</span>
-              </button>
-            </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleResetTimerTabOrder();
+                  }}
+                  className="px-2.5 py-1 rounded-full text-xs font-bold text-[#3B7E10] dark:text-[#80D141] bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] dark:hover:bg-[#283A23] border border-[#D8E8D0] dark:border-[#273722] flex items-center gap-1 transition-colors cursor-pointer"
+                  title={t('settings.resetTimerTabOrder', 'Reset Tabs Order')}
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span className="hidden sm:inline">{t('settings.resetNavOrder', 'Reset Order')}</span>
+                </button>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-[#485B44] dark:text-[#9EB598] group-hover:text-[#151E14] dark:group-hover:text-[#E8F2E4] group-hover:bg-[#EDF6E8] dark:group-hover:bg-[#202E1E] transition-colors">
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expandedSections['focus'] ? 'rotate-180' : ''}`} />
+                </div>
+              </div>
+            </button>
 
-            {/* Interactive Reordering List */}
-            <div className="space-y-2 pt-1">
-              {currentFocusTabOrder.map((tabId, index) => {
-                const isFocus = tabId === 'focus';
-                const icon = isFocus ? <Timer className="w-5 h-5" /> : <Clock className="w-5 h-5" />;
-                const label = isFocus ? t('timer.tabFocus') : t('timer.tabTracker');
-                const desc = isFocus ? t('settings.timerFocusDesc') : t('settings.timerTrackerDesc');
-                const isFirst = index === 0;
-                const isLast = index === currentFocusTabOrder.length - 1;
+            <AnimatePresence initial={false}>
+              {expandedSections['focus'] && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22, ease: 'easeInOut' }}
+                >
+                  <div className="px-5 pb-5 sm:px-6 sm:pb-6 pt-2 border-t border-[#DCEAD4]/80 dark:border-[#263722] space-y-4">
+                    {/* Interactive Reordering List */}
+                    <div className="space-y-2 pt-1">
+                      {currentFocusTabOrder.map((tabId, index) => {
+                        const isFocus = tabId === 'focus';
+                        const icon = isFocus ? <Timer className="w-5 h-5" /> : <Clock className="w-5 h-5" />;
+                        const label = isFocus ? t('timer.tabFocus') : t('timer.tabTracker');
+                        const desc = isFocus ? t('settings.timerFocusDesc') : t('settings.timerTrackerDesc');
+                        const isFirst = index === 0;
+                        const isLast = index === currentFocusTabOrder.length - 1;
 
-                return (
-                  <motion.div
-                    key={tabId}
-                    layout
-                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-                    className="flex items-center justify-between p-3 sm:p-3.5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] hover:border-[#80D141]/60 transition-colors group"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      {/* Position Number */}
-                      <span className="w-6 h-6 rounded-full bg-white dark:bg-[#263722] border border-[#DCEAD4] dark:border-[#344D2F] flex items-center justify-center text-xs font-bold text-[#485B44] dark:text-[#9EB598] shrink-0">
-                        {isDraftFa ? (index + 1).toLocaleString('fa-IR') : index + 1}
-                      </span>
+                        return (
+                          <motion.div
+                            key={tabId}
+                            layout
+                            transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                            className="flex items-center justify-between p-3 sm:p-3.5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] hover:border-[#80D141]/60 transition-colors group"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              {/* Position Number */}
+                              <span className="w-6 h-6 rounded-full bg-white dark:bg-[#263722] border border-[#DCEAD4] dark:border-[#344D2F] flex items-center justify-center text-xs font-bold text-[#485B44] dark:text-[#9EB598] shrink-0">
+                                {isDraftFa ? (index + 1).toLocaleString('fa-IR') : index + 1}
+                              </span>
 
-                      {/* Icon */}
-                      <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1E4300] dark:text-[#80D141] flex items-center justify-center shrink-0">
-                        {icon}
-                      </div>
+                              {/* Icon */}
+                              <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1E4300] dark:text-[#80D141] flex items-center justify-center shrink-0">
+                                {icon}
+                              </div>
 
-                      {/* Name & Subtitle */}
-                      <div className="min-w-0">
-                        <h4 className="font-bold text-sm text-[#151E14] dark:text-[#E8F2E4] truncate">
-                          {label}
-                        </h4>
-                        <p className="text-[11px] text-[#485B44] dark:text-[#9EB598] truncate hidden sm:block">
-                          {desc}
-                        </p>
-                      </div>
+                              {/* Name & Subtitle */}
+                              <div className="min-w-0">
+                                <h4 className="font-bold text-sm text-[#151E14] dark:text-[#E8F2E4] truncate">
+                                  {label}
+                                </h4>
+                                <p className="text-[11px] text-[#485B44] dark:text-[#9EB598] truncate hidden sm:block">
+                                  {desc}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Reorder Buttons (Move Up / Move Down) */}
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleMoveTimerTab(index, 'up')}
+                                disabled={isFirst}
+                                aria-label={`Move ${label} Up`}
+                                className="p-2 rounded-xl bg-white dark:bg-[#263722] border border-[#DCEAD4] dark:border-[#33482E] text-[#485B44] dark:text-[#9EB598] hover:text-[#151E14] dark:hover:text-[#E8F2E4] hover:bg-[#E2F2D9] dark:hover:bg-[#2E4229] disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90 cursor-pointer"
+                                title="Move Up"
+                              >
+                                <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleMoveTimerTab(index, 'down')}
+                                disabled={isLast}
+                                aria-label={`Move ${label} Down`}
+                                className="p-2 rounded-xl bg-white dark:bg-[#263722] border border-[#DCEAD4] dark:border-[#33482E] text-[#485B44] dark:text-[#9EB598] hover:text-[#151E14] dark:hover:text-[#E8F2E4] hover:bg-[#E2F2D9] dark:hover:bg-[#2E4229] disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90 cursor-pointer"
+                                title="Move Down"
+                              >
+                                <ArrowDown className="w-4 h-4 stroke-[2.5]" />
+                              </button>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
                     </div>
-
-                    {/* Reorder Buttons (Move Up / Move Down) */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => handleMoveTimerTab(index, 'up')}
-                        disabled={isFirst}
-                        aria-label={`Move ${label} Up`}
-                        className="p-2 rounded-xl bg-white dark:bg-[#263722] border border-[#DCEAD4] dark:border-[#33482E] text-[#485B44] dark:text-[#9EB598] hover:text-[#151E14] dark:hover:text-[#E8F2E4] hover:bg-[#E2F2D9] dark:hover:bg-[#2E4229] disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90 cursor-pointer"
-                        title="Move Up"
-                      >
-                        <ArrowUp className="w-4 h-4 stroke-[2.5]" />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleMoveTimerTab(index, 'down')}
-                        disabled={isLast}
-                        aria-label={`Move ${label} Down`}
-                        className="p-2 rounded-xl bg-white dark:bg-[#263722] border border-[#DCEAD4] dark:border-[#33482E] text-[#485B44] dark:text-[#9EB598] hover:text-[#151E14] dark:hover:text-[#E8F2E4] hover:bg-[#E2F2D9] dark:hover:bg-[#2E4229] disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-90 cursor-pointer"
-                        title="Move Down"
-                      >
-                        <ArrowDown className="w-4 h-4 stroke-[2.5]" />
-                      </button>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </section>
 
-          {/* Feature 2: Journal Categories Customization */}
-          <section className="p-5 sm:p-6 rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center text-[#234A00] dark:text-[#80D141]">
+          {/* Feature 2: Journal Categories Customization (Expandable) */}
+          <section id="section-settings-categories" className="rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm transition-all duration-200 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => toggleSection('categories')}
+              aria-expanded={expandedSections['categories']}
+              className="w-full p-4 sm:p-5 flex items-center justify-between text-start gap-3 hover:bg-[#F9FAF6] dark:hover:bg-[#1C2819] transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center text-[#234A00] dark:text-[#80D141] shrink-0 group-hover:scale-105 transition-transform">
                   <Tag className="w-4 h-4" />
                 </div>
-                <div>
-                  <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
-                    {t('settings.categoriesSection', 'Journal & Task Categories')}
-                  </h3>
-                  <p className="text-xs text-[#485B44] dark:text-[#9EB598]">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                      {t('settings.categoriesSection', 'Journal & Task Categories')}
+                    </h3>
+                    <span className="text-[11px] font-semibold text-[#3B7E10] dark:text-[#80D141] px-2 py-0.5 rounded-full bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/30">
+                      {isDraftFa ? `${currentCategories.length} برچسب` : `${currentCategories.length} tags`}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#485B44] dark:text-[#9EB598] truncate">
                     {t('settings.categoriesDesc', 'Personalize categorization tags for your notes and tasks')}
                   </p>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleResetCategories}
-                className="px-3 py-1.5 rounded-full text-xs font-bold text-[#3B7E10] dark:text-[#80D141] bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] dark:hover:bg-[#283A23] border border-[#D8E8D0] dark:border-[#273722] flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Reset to default tags"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>{t('common.reset', 'Reset')}</span>
-              </button>
-            </div>
-
-            {/* Category Chips */}
-            <div className="flex flex-wrap gap-2 pt-1">
-              {currentCategories.map((cat) => (
-                <div
-                  key={cat}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] shadow-2xs group"
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleResetCategories();
+                  }}
+                  className="px-2.5 py-1 rounded-full text-xs font-bold text-[#3B7E10] dark:text-[#80D141] bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] dark:hover:bg-[#283A23] border border-[#D8E8D0] dark:border-[#273722] flex items-center gap-1 transition-colors cursor-pointer"
+                  title="Reset to default tags"
                 >
-                  <span>{getCategoryLabel(cat, language)}</span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveCategory(cat)}
-                    disabled={currentCategories.length <= 1}
-                    className="p-0.5 rounded-full hover:bg-[#FFEAEA] dark:hover:bg-[#3E1C18] text-[#79747E] hover:text-[#B3261E] dark:hover:text-[#F2B8B5] disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
-                    title={`Remove ${cat}`}
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
+                  <RotateCcw className="w-3 h-3" />
+                  <span className="hidden sm:inline">{t('common.reset', 'Reset')}</span>
+                </button>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-[#485B44] dark:text-[#9EB598] group-hover:text-[#151E14] dark:group-hover:text-[#E8F2E4] group-hover:bg-[#EDF6E8] dark:group-hover:bg-[#202E1E] transition-colors">
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expandedSections['categories'] ? 'rotate-180' : ''}`} />
                 </div>
-              ))}
-            </div>
+              </div>
+            </button>
 
-            {/* Add Category Input */}
-            <form onSubmit={handleAddCategory} className="flex gap-2 pt-1">
-              <input
-                type="text"
-                value={newCatInput}
-                onChange={(e) => {
-                  setNewCatInput(e.target.value);
-                  if (catError) setCatError(null);
-                }}
-                maxLength={20}
-                placeholder={t('settings.categoryPlaceholder', 'Add new category (e.g. Creative, Finance)...')}
-                className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] text-xs text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
-              />
-              <button
-                type="submit"
-                disabled={!newCatInput.trim()}
-                className="px-4 py-2.5 rounded-xl bg-[#80D141] hover:bg-[#72BF36] disabled:opacity-40 text-[#0F2600] text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all shrink-0"
-              >
-                <Plus className="w-4 h-4 stroke-[2.5]" />
-                <span>{t('settings.addCategory', 'Add Tag')}</span>
-              </button>
-            </form>
+            <AnimatePresence initial={false}>
+              {expandedSections['categories'] && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22, ease: 'easeInOut' }}
+                >
+                  <div className="px-5 pb-5 sm:px-6 sm:pb-6 pt-2 border-t border-[#DCEAD4]/80 dark:border-[#263722] space-y-4">
+                    {/* Category Chips */}
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {currentCategories.map((cat) => (
+                        <div
+                          key={cat}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] shadow-2xs group"
+                        >
+                          <span>{getCategoryLabel(cat, language)}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCategory(cat)}
+                            disabled={currentCategories.length <= 1}
+                            className="p-0.5 rounded-full hover:bg-[#FFEAEA] dark:hover:bg-[#3E1C18] text-[#79747E] hover:text-[#B3261E] dark:hover:text-[#F2B8B5] disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer"
+                            title={`Remove ${cat}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
 
-            {catError && (
-              <p className="text-[11px] font-semibold text-[#B3261E] dark:text-[#F2B8B5]">
-                {catError}
-              </p>
-            )}
+                    {/* Add Category Input */}
+                    <form onSubmit={handleAddCategory} className="flex gap-2 pt-1">
+                      <input
+                        type="text"
+                        value={newCatInput}
+                        onChange={(e) => {
+                          setNewCatInput(e.target.value);
+                          if (catError) setCatError(null);
+                        }}
+                        maxLength={20}
+                        placeholder={t('settings.categoryPlaceholder', 'Add new category (e.g. Creative, Finance)...')}
+                        className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] text-xs text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+                      />
+                      <button
+                        type="submit"
+                        disabled={!newCatInput.trim()}
+                        className="px-4 py-2.5 rounded-xl bg-[#80D141] hover:bg-[#72BF36] disabled:opacity-40 text-[#0F2600] text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all shrink-0"
+                      >
+                        <Plus className="w-4 h-4 stroke-[2.5]" />
+                        <span>{t('settings.addCategory', 'Add Tag')}</span>
+                      </button>
+                    </form>
+
+                    {catError && (
+                      <p className="text-[11px] font-semibold text-[#B3261E] dark:text-[#F2B8B5]">
+                        {catError}
+                      </p>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </section>
 
-        </div>
-
-        {/* Right Column: Appearance, Audio & Data Management */}
-        <div className="lg:col-span-5 space-y-6">
-          
-          {/* Theme & Visuals */}
-          <section className="p-5 sm:p-6 rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm space-y-4">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center text-[#234A00] dark:text-[#80D141]">
-                <Sun className="w-4 h-4" />
-              </div>
-              <div>
-                <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
-                  {t('settings.themeSection', 'Visual Theme')}
-                </h3>
-                <p className="text-xs text-[#485B44] dark:text-[#9EB598]">
-                  {t('settings.themeDesc', 'Eye-safe Forest Dark or Gentle Light')}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setDraftPrefs((prev) => ({ ...prev, theme: 'dark' }));
-                  onUpdatePrefs({ theme: 'dark' });
-                  soundEngine.playPop();
-                }}
-                className={`py-3 px-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border transition-all cursor-pointer ${
-                  draftPrefs.theme === 'dark'
-                    ? 'bg-[#80D141] text-[#0F2600] border-[#80D141] shadow-xs'
-                    : 'bg-[#F7FAF4] dark:bg-[#1C2919] text-[#485B44] dark:text-[#9EB598] border-[#DCEAD4] dark:border-[#2A3E26] hover:bg-[#E2F5D1]'
-                }`}
-              >
-                <Moon className="w-4 h-4" />
-                <span>{t('settings.themeDark', 'Forest Dark')}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setDraftPrefs((prev) => ({ ...prev, theme: 'light' }));
-                  onUpdatePrefs({ theme: 'light' });
-                  soundEngine.playPop();
-                }}
-                className={`py-3 px-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border transition-all cursor-pointer ${
-                  draftPrefs.theme === 'light'
-                    ? 'bg-[#80D141] text-[#0F2600] border-[#80D141] shadow-xs'
-                    : 'bg-[#F7FAF4] dark:bg-[#1C2919] text-[#485B44] dark:text-[#9EB598] border-[#DCEAD4] dark:border-[#2A3E26] hover:bg-[#E2F5D1]'
-                }`}
-              >
-                <Sun className="w-4 h-4" />
-                <span>{t('settings.themeLight', 'Gentle Light')}</span>
-              </button>
-            </div>
-          </section>
-
-          {/* Audio & Sensory Feedback */}
-          <section className="p-5 sm:p-6 rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center text-[#234A00] dark:text-[#80D141]">
+          {/* Audio & Sensory Feedback (Expandable) */}
+          <section id="section-settings-audio" className="rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm transition-all duration-200 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => toggleSection('audio')}
+              aria-expanded={expandedSections['audio']}
+              className="w-full p-4 sm:p-5 flex items-center justify-between text-start gap-3 hover:bg-[#F9FAF6] dark:hover:bg-[#1C2819] transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center text-[#234A00] dark:text-[#80D141] shrink-0 group-hover:scale-105 transition-transform">
                   {(draftPrefs.soundEffectsEnabled ?? true) ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
                 </div>
-                <div>
-                  <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
-                    {t('settings.audioSection', 'Audio & Sensory Cues')}
-                  </h3>
-                  <p className="text-xs text-[#485B44] dark:text-[#9EB598]">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                      {t('settings.audioSection', 'Audio & Sensory Cues')}
+                    </h3>
+                    <span className="text-[11px] font-semibold text-[#3B7E10] dark:text-[#80D141] px-2 py-0.5 rounded-full bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/30">
+                      {(draftPrefs.soundEffectsEnabled ?? true) ? (isDraftFa ? 'صدا فعال' : 'Sound On') : (isDraftFa ? 'بی‌صدا' : 'Muted')}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#485B44] dark:text-[#9EB598] truncate">
                     {t('settings.audioDesc', 'Haptic audio clicks & completion chimes')}
                   </p>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  soundEngine.playGentleChime();
-                }}
-                className="px-2.5 py-1 rounded-full bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] text-[11px] font-bold text-[#3B4E37] dark:text-[#B6CCB0] border border-[#D8E8D0] dark:border-[#273722] flex items-center gap-1 cursor-pointer"
-                title="Play test chime"
-              >
-                <Volume1 className="w-3.5 h-3.5" />
-                <span>{t('common.test', 'Test')}</span>
-              </button>
-            </div>
-
-            {/* Master UI Sounds */}
-            <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26]">
-              <div className="text-xs">
-                <div className="font-bold text-[#151E14] dark:text-[#E8F2E4]">{t('settings.uiSounds', 'UI Sound Effects')}</div>
-                <div className="text-[#485B44] dark:text-[#9EB598] text-[11px]">{t('settings.uiSoundsSub', 'Subtle pops, navigation taps, and feedback')}</div>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={draftPrefs.soundEffectsEnabled ?? true}
-                  onChange={(e) => {
-                    const isEnabled = e.target.checked;
-                    setDraftPrefs((prev) => ({ ...prev, soundEffectsEnabled: isEnabled }));
-                    if (isEnabled) {
-                      soundEngine.playPop();
-                    }
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    soundEngine.playGentleChime();
                   }}
-                  className="sr-only peer"
-                />
-                <div className="w-9 h-5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] rtl:after:left-auto rtl:after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#80D141]"></div>
-              </label>
-            </div>
-
-            {/* Harmonic Completion Chime */}
-            <div className={`flex items-center justify-between p-3.5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] transition-opacity ${
-              !(draftPrefs.soundEffectsEnabled ?? true) ? 'opacity-50 pointer-events-none' : ''
-            }`}>
-              <div className="text-xs">
-                <div className="font-bold text-[#151E14] dark:text-[#E8F2E4]">{t('settings.taskChimes', 'Task Completion Chimes')}</div>
-                <div className="text-[#485B44] dark:text-[#9EB598] text-[11px]">{t('settings.taskChimesSub', 'Gentle arpeggio on task done & timer finish')}</div>
+                  className="px-2.5 py-1 rounded-full bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] text-[11px] font-bold text-[#3B4E37] dark:text-[#B6CCB0] border border-[#D8E8D0] dark:border-[#273722] flex items-center gap-1 cursor-pointer"
+                  title="Play test chime"
+                >
+                  <Volume1 className="w-3.5 h-3.5" />
+                  <span>{t('common.test', 'Test')}</span>
+                </button>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-[#485B44] dark:text-[#9EB598] group-hover:text-[#151E14] dark:group-hover:text-[#E8F2E4] group-hover:bg-[#EDF6E8] dark:group-hover:bg-[#202E1E] transition-colors">
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expandedSections['audio'] ? 'rotate-180' : ''}`} />
+                </div>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  disabled={!(draftPrefs.soundEffectsEnabled ?? true)}
-                  checked={(draftPrefs.soundAlerts ?? true) && (draftPrefs.soundEffectsEnabled ?? true)}
-                  onChange={(e) => {
-                    const isAlerts = e.target.checked;
-                    setDraftPrefs((prev) => ({ ...prev, soundAlerts: isAlerts }));
-                    if (isAlerts && (draftPrefs.soundEffectsEnabled ?? true)) {
-                      soundEngine.playGentleChime();
-                    }
-                  }}
-                  className="sr-only peer"
-                />
-                <div className="w-9 h-5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] rtl:after:left-auto rtl:after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#80D141]"></div>
-              </label>
-            </div>
+            </button>
+
+            <AnimatePresence initial={false}>
+              {expandedSections['audio'] && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22, ease: 'easeInOut' }}
+                >
+                  <div className="px-5 pb-5 sm:px-6 sm:pb-6 pt-2 border-t border-[#DCEAD4]/80 dark:border-[#263722] space-y-4">
+                    {/* Master UI Sounds */}
+                    <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26]">
+                      <div className="text-xs">
+                        <div className="font-bold text-[#151E14] dark:text-[#E8F2E4]">{t('settings.uiSounds', 'UI Sound Effects')}</div>
+                        <div className="text-[#485B44] dark:text-[#9EB598] text-[11px]">{t('settings.uiSoundsSub', 'Subtle pops, navigation taps, and feedback')}</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={draftPrefs.soundEffectsEnabled ?? true}
+                          onChange={(e) => {
+                            const isEnabled = e.target.checked;
+                            setDraftPrefs((prev) => ({ ...prev, soundEffectsEnabled: isEnabled }));
+                            if (isEnabled) {
+                              soundEngine.playPop();
+                            }
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] rtl:after:left-auto rtl:after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#80D141]"></div>
+                      </label>
+                    </div>
+
+                    {/* Harmonic Completion Chime */}
+                    <div className={`flex items-center justify-between p-3.5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] transition-opacity ${
+                      !(draftPrefs.soundEffectsEnabled ?? true) ? 'opacity-50 pointer-events-none' : ''
+                    }`}>
+                      <div className="text-xs">
+                        <div className="font-bold text-[#151E14] dark:text-[#E8F2E4]">{t('settings.taskChimes', 'Task Completion Chimes')}</div>
+                        <div className="text-[#485B44] dark:text-[#9EB598] text-[11px]">{t('settings.taskChimesSub', 'Gentle arpeggio on task done & timer finish')}</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          disabled={!(draftPrefs.soundEffectsEnabled ?? true)}
+                          checked={(draftPrefs.soundAlerts ?? true) && (draftPrefs.soundEffectsEnabled ?? true)}
+                          onChange={(e) => {
+                            const isAlerts = e.target.checked;
+                            setDraftPrefs((prev) => ({ ...prev, soundAlerts: isAlerts }));
+                            if (isAlerts && (draftPrefs.soundEffectsEnabled ?? true)) {
+                              soundEngine.playGentleChime();
+                            }
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] rtl:after:left-auto rtl:after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#80D141]"></div>
+                      </label>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </section>
 
-          {/* Backup, Export & Danger Zone */}
-          <section className="p-5 sm:p-6 rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm space-y-4">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center text-[#234A00] dark:text-[#80D141]">
-                <Download className="w-4 h-4" />
-              </div>
-              <div>
-                <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
-                  {t('settings.backupSection', 'Backup & Data')}
-                </h3>
-                <p className="text-xs text-[#485B44] dark:text-[#9EB598]">
-                  {t('settings.backupDesc', 'Export or restore your workspace locally')}
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={handleExport}
-                className="py-2.5 px-3 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] hover:bg-[#E2F5D1] dark:hover:bg-[#2E422A] text-[#1D3A00] dark:text-[#A2EB68] text-xs font-bold border border-[#DCEAD4] dark:border-[#2A3E26] shadow-2xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>{t('settings.exportBtn', 'Export JSON')}</span>
-              </button>
-
-              <label className="py-2.5 px-3 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] hover:bg-[#E2F5D1] dark:hover:bg-[#2E422A] text-[#1D3A00] dark:text-[#A2EB68] text-xs font-bold border border-[#DCEAD4] dark:border-[#2A3E26] shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors">
-                <Upload className="w-3.5 h-3.5" />
-                <span>{t('settings.restoreBtn', 'Restore JSON')}</span>
-                <input type="file" accept=".json" onChange={handleImportFile} className="hidden" />
-              </label>
-            </div>
-
-            {importStatus && (
-              <div className="text-xs font-bold text-green-700 dark:text-green-400 text-center">
-                {importStatus}
-              </div>
-            )}
-
-            {/* Clean All Predefined Data (Start Fresh) */}
-            <div className="p-4 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] space-y-3">
-              <div className="flex items-start gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-950/70 border border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 flex items-center justify-center shrink-0">
-                  <Eraser className="w-4 h-4" />
+          {/* Backup, Export & Danger Zone (Expandable) */}
+          <section id="section-settings-backup" className="rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm transition-all duration-200 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => toggleSection('backup')}
+              aria-expanded={expandedSections['backup']}
+              className="w-full p-4 sm:p-5 flex items-center justify-between text-start gap-3 hover:bg-[#F9FAF6] dark:hover:bg-[#1C2819] transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center text-[#234A00] dark:text-[#80D141] shrink-0 group-hover:scale-105 transition-transform">
+                  <Download className="w-4 h-4" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-xs sm:text-sm font-bold text-[#151E14] dark:text-[#E8F2E4]">
-                    {t('settings.cleanWorkspaceBtn', 'Clean All Predefined Tasks & Habits')}
-                  </h4>
-                  <p className="text-[11px] text-[#485B44] dark:text-[#9EB598] leading-relaxed mt-0.5">
-                    {t('settings.cleanWorkspaceDesc', 'Wipe out sample tasks, habits, and notes so you have a pristine, clean workspace ready for your own use. Your settings, API keys, and theme are preserved.')}
-                  </p>
-                </div>
-              </div>
-
-              {!showCleanConfirm ? (
-                <button
-                  type="button"
-                  id="btn-clean-predefined-data"
-                  onClick={() => {
-                    soundEngine.playPop();
-                    setShowCleanConfirm(true);
-                  }}
-                  className="w-full py-2.5 px-3 rounded-xl bg-white dark:bg-[#202E1E] hover:bg-amber-50 dark:hover:bg-amber-950/50 text-amber-800 dark:text-amber-300 text-xs font-bold border border-amber-300 dark:border-amber-800/80 shadow-2xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                >
-                  <Eraser className="w-3.5 h-3.5" />
-                  <span>{t('settings.cleanWorkspaceBtn', 'Clean All Predefined Tasks & Habits')}</span>
-                </button>
-              ) : (
-                <div className="p-3 rounded-xl bg-amber-50/90 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 space-y-2.5">
-                  <p className="text-xs font-semibold text-amber-950 dark:text-amber-200 leading-relaxed">
-                    {t('settings.cleanConfirmDesc', 'This will remove all sample habits, journal entries, brain dump thoughts, and schedules. Your settings and API keys will remain untouched.')}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowCleanConfirm(false)}
-                      className="flex-1 py-1.5 px-3 rounded-lg bg-white dark:bg-[#1C281A] text-xs font-bold text-[#485B44] dark:text-[#9EB598] border border-[#DCEAD4] dark:border-[#2A3E26] hover:bg-[#EDF6E8] cursor-pointer"
-                    >
-                      {t('common.cancel', 'Cancel')}
-                    </button>
-                    <button
-                      type="button"
-                      id="btn-confirm-clean-workspace"
-                      onClick={handleCleanPredefinedData}
-                      className="flex-1 py-1.5 px-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>{isDraftFa ? 'بله، همه را پاک کن' : 'Yes, Clean All'}</span>
-                    </button>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                      {t('settings.backupSection', 'Backup & Data')}
+                    </h3>
+                    <span className="text-[11px] font-semibold text-[#3B7E10] dark:text-[#80D141] px-2 py-0.5 rounded-full bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/30">
+                      {isDraftFa ? 'صادرات و بازنشانی' : 'Export & Reset'}
+                    </span>
                   </div>
-                </div>
-              )}
-
-              {cleanSuccessMessage && (
-                <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-800 text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                  <span>{cleanSuccessMessage}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Reset Demo Data */}
-            <div className="p-4 rounded-2xl bg-[#F7FAF4] dark:bg-[#1A2617] border border-[#DCEAD4] dark:border-[#2A3E26] space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 flex items-center justify-center shrink-0">
-                  <RotateCcw className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-xs sm:text-sm font-bold text-[#151E14] dark:text-[#E8F2E4]">
-                    {t('settings.resetDemoBtn', 'Reset Demo Data')}
-                  </h4>
-                  <p className="text-[11px] text-[#485B44] dark:text-[#9EB598] leading-relaxed mt-0.5">
-                    {t('settings.resetConfirmDesc', 'Restore sample habits, tasks, projects, and journal entries so you can explore all Lerni companion features? Your settings and API keys will remain untouched.')}
+                  <p className="text-xs text-[#485B44] dark:text-[#9EB598] truncate">
+                    {t('settings.backupDesc', 'Export or restore your workspace locally')}
                   </p>
                 </div>
               </div>
 
-              {!showResetConfirm ? (
-                <button
-                  type="button"
-                  id="btn-reset-demo-data"
-                  onClick={() => {
-                    soundEngine.playPop();
-                    setShowResetConfirm(true);
-                    setShowCleanConfirm(false);
-                  }}
-                  className="w-full py-2.5 px-3 rounded-xl bg-white dark:bg-[#202E1E] hover:bg-blue-50 dark:hover:bg-blue-950/50 text-blue-800 dark:text-blue-300 text-xs font-bold border border-blue-300 dark:border-blue-800/80 shadow-2xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>{t('settings.resetDemoBtn', 'Reset Demo Data')}</span>
-                </button>
-              ) : (
-                <div className="p-3 rounded-xl bg-blue-50/90 dark:bg-blue-950/60 border border-blue-300 dark:border-blue-800 space-y-2.5">
-                  <p className="text-xs font-semibold text-blue-950 dark:text-blue-200 leading-relaxed">
-                    {t('settings.resetConfirmDesc', 'Restore sample habits, tasks, projects, and journal entries so you can explore all Lerni companion features? Your settings and API keys will remain untouched.')}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowResetConfirm(false)}
-                      className="flex-1 py-1.5 px-3 rounded-lg bg-white dark:bg-[#1C281A] text-xs font-bold text-[#485B44] dark:text-[#9EB598] border border-[#DCEAD4] dark:border-[#2A3E26] hover:bg-[#EDF6E8] cursor-pointer"
-                    >
-                      {t('common.cancel', 'Cancel')}
-                    </button>
-                    <button
-                      type="button"
-                      id="btn-confirm-reset-demo"
-                      onClick={handleResetDemoData}
-                      className="flex-1 py-1.5 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>{isDraftFa ? 'بله، بازنشانی داده‌های نمونه' : 'Yes, Reset Demo Data'}</span>
-                    </button>
-                  </div>
-                </div>
-              )}
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-[#485B44] dark:text-[#9EB598] group-hover:text-[#151E14] dark:group-hover:text-[#E8F2E4] group-hover:bg-[#EDF6E8] dark:group-hover:bg-[#202E1E] transition-colors shrink-0">
+                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expandedSections['backup'] ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
 
-              {resetSuccessMessage && (
-                <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-800 text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                  <span>{resetSuccessMessage}</span>
-                </div>
+            <AnimatePresence initial={false}>
+              {expandedSections['backup'] && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22, ease: 'easeInOut' }}
+                >
+                  <div className="px-5 pb-5 sm:px-6 sm:pb-6 pt-2 border-t border-[#DCEAD4]/80 dark:border-[#263722] space-y-4">
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <button
+                        onClick={handleExport}
+                        className="py-2.5 px-3 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] hover:bg-[#E2F5D1] dark:hover:bg-[#2E422A] text-[#1D3A00] dark:text-[#A2EB68] text-xs font-bold border border-[#DCEAD4] dark:border-[#2A3E26] shadow-2xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>{t('settings.exportBtn', 'Export JSON')}</span>
+                      </button>
+
+                      <label className="py-2.5 px-3 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] hover:bg-[#E2F5D1] dark:hover:bg-[#2E422A] text-[#1D3A00] dark:text-[#A2EB68] text-xs font-bold border border-[#DCEAD4] dark:border-[#2A3E26] shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer transition-colors">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>{t('settings.restoreBtn', 'Restore JSON')}</span>
+                        <input type="file" accept=".json" onChange={handleImportFile} className="hidden" />
+                      </label>
+                    </div>
+
+                    {importStatus && (
+                      <div className="text-xs font-bold text-green-700 dark:text-green-400 text-center">
+                        {importStatus}
+                      </div>
+                    )}
+
+                    {/* Clean All Predefined Data (Start Fresh) */}
+                    <div className="p-4 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] space-y-3">
+                      <div className="flex items-start gap-2.5">
+                        <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-950/70 border border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 flex items-center justify-center shrink-0">
+                          <Eraser className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-xs sm:text-sm font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                            {t('settings.cleanWorkspaceBtn', 'Clean All Predefined Tasks & Habits')}
+                          </h4>
+                          <p className="text-[11px] text-[#485B44] dark:text-[#9EB598] leading-relaxed mt-0.5">
+                            {t('settings.cleanWorkspaceDesc', 'Wipe out sample tasks, habits, and notes so you have a pristine, clean workspace ready for your own use. Your settings, API keys, and theme are preserved.')}
+                          </p>
+                        </div>
+                      </div>
+
+                      {!showCleanConfirm ? (
+                        <button
+                          type="button"
+                          id="btn-clean-predefined-data"
+                          onClick={() => {
+                            soundEngine.playPop();
+                            setShowCleanConfirm(true);
+                          }}
+                          className="w-full py-2.5 px-3 rounded-xl bg-white dark:bg-[#202E1E] hover:bg-amber-50 dark:hover:bg-amber-950/50 text-amber-800 dark:text-amber-300 text-xs font-bold border border-amber-300 dark:border-amber-800/80 shadow-2xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                        >
+                          <Eraser className="w-3.5 h-3.5" />
+                          <span>{t('settings.cleanWorkspaceBtn', 'Clean All Predefined Tasks & Habits')}</span>
+                        </button>
+                      ) : (
+                        <div className="p-3 rounded-xl bg-amber-50/90 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 space-y-2.5">
+                          <p className="text-xs font-semibold text-amber-950 dark:text-amber-200 leading-relaxed">
+                            {t('settings.cleanConfirmDesc', 'This will remove all sample habits, journal entries, brain dump thoughts, and schedules. Your settings and API keys will remain untouched.')}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowCleanConfirm(false)}
+                              className="flex-1 py-1.5 px-3 rounded-lg bg-white dark:bg-[#1C281A] text-xs font-bold text-[#485B44] dark:text-[#9EB598] border border-[#DCEAD4] dark:border-[#2A3E26] hover:bg-[#EDF6E8] cursor-pointer"
+                            >
+                              {t('common.cancel', 'Cancel')}
+                            </button>
+                            <button
+                              type="button"
+                              id="btn-confirm-clean-workspace"
+                              onClick={handleCleanPredefinedData}
+                              className="flex-1 py-1.5 px-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>{isDraftFa ? 'بله، همه را پاک کن' : 'Yes, Clean All'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {cleanSuccessMessage && (
+                        <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-800 text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                          <span>{cleanSuccessMessage}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Reset Demo Data */}
+                    <div className="p-4 rounded-2xl bg-[#F7FAF4] dark:bg-[#1A2617] border border-[#DCEAD4] dark:border-[#2A3E26] space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 flex items-center justify-center shrink-0">
+                          <RotateCcw className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-xs sm:text-sm font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                            {t('settings.resetDemoBtn', 'Reset Demo Data')}
+                          </h4>
+                          <p className="text-[11px] text-[#485B44] dark:text-[#9EB598] leading-relaxed mt-0.5">
+                            {t('settings.resetConfirmDesc', 'Restore sample habits, tasks, projects, and journal entries so you can explore all Lerni companion features? Your settings and API keys will remain untouched.')}
+                          </p>
+                        </div>
+                      </div>
+
+                      {!showResetConfirm ? (
+                        <button
+                          type="button"
+                          id="btn-reset-demo-data"
+                          onClick={() => {
+                            soundEngine.playPop();
+                            setShowResetConfirm(true);
+                            setShowCleanConfirm(false);
+                          }}
+                          className="w-full py-2.5 px-3 rounded-xl bg-white dark:bg-[#202E1E] hover:bg-blue-50 dark:hover:bg-blue-950/50 text-blue-800 dark:text-blue-300 text-xs font-bold border border-blue-300 dark:border-blue-800/80 shadow-2xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>{t('settings.resetDemoBtn', 'Reset Demo Data')}</span>
+                        </button>
+                      ) : (
+                        <div className="p-3 rounded-xl bg-blue-50/90 dark:bg-blue-950/60 border border-blue-300 dark:border-blue-800 space-y-2.5">
+                          <p className="text-xs font-semibold text-blue-950 dark:text-blue-200 leading-relaxed">
+                            {t('settings.resetConfirmDesc', 'Restore sample habits, tasks, projects, and journal entries so you can explore all Lerni companion features? Your settings and API keys will remain untouched.')}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowResetConfirm(false)}
+                              className="flex-1 py-1.5 px-3 rounded-lg bg-white dark:bg-[#1C281A] text-xs font-bold text-[#485B44] dark:text-[#9EB598] border border-[#DCEAD4] dark:border-[#2A3E26] hover:bg-[#EDF6E8] cursor-pointer"
+                            >
+                              {t('common.cancel', 'Cancel')}
+                            </button>
+                            <button
+                              type="button"
+                              id="btn-confirm-reset-demo"
+                              onClick={handleResetDemoData}
+                              className="flex-1 py-1.5 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>{isDraftFa ? 'بله، بازنشانی داده‌های نمونه' : 'Yes, Reset Demo Data'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {resetSuccessMessage && (
+                        <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-800 text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                          <span>{resetSuccessMessage}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
               )}
-            </div>
+            </AnimatePresence>
           </section>
 
         </div>
