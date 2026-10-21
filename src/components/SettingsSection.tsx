@@ -59,7 +59,6 @@ import {
   DEFAULT_CUSTOM_OPENAI_MODEL,
   GEMINI_MODEL_PRESETS,
   OPENROUTER_MODEL_PRESETS,
-  CUSTOM_OPENAI_PRESETS,
   isLocalEndpoint,
 } from '../types';
 import { storage, DEFAULT_JOURNAL_CATEGORIES } from '../utils/storage';
@@ -124,7 +123,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
         setCustomBaseUrlInput(
           prefs.customOpenAiBaseUrl ||
             (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_OPENAI_COMPATIBLE_BASE_URL : '') ||
-            DEFAULT_CUSTOM_OPENAI_BASE_URL
+            ''
         );
         setCustomKeyInput(
           prefs.customOpenAiApiKey ||
@@ -134,7 +133,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
         setCustomModelInput(
           prefs.customOpenAiModel ||
             (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_OPENAI_COMPATIBLE_MODEL : '') ||
-            DEFAULT_CUSTOM_OPENAI_MODEL
+            ''
         );
         setCustomApiVersionInput(
           prefs.customOpenAiApiVersion ||
@@ -161,11 +160,11 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   const [openRouterKeyInput, setOpenRouterKeyInput] = useState(prefs.openRouterApiKey || '');
   const [openRouterModelInput, setOpenRouterModelInput] = useState(prefs.openRouterModel || DEFAULT_OPENROUTER_MODEL);
 
-  // Custom OpenAI-compatible state
+  // Custom OpenAI-compatible state (clean inputs, user defines everything)
   const [customBaseUrlInput, setCustomBaseUrlInput] = useState(
     prefs.customOpenAiBaseUrl ||
       (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_OPENAI_COMPATIBLE_BASE_URL : '') ||
-      DEFAULT_CUSTOM_OPENAI_BASE_URL
+      ''
   );
   const [customKeyInput, setCustomKeyInput] = useState(
     prefs.customOpenAiApiKey ||
@@ -175,14 +174,13 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   const [customModelInput, setCustomModelInput] = useState(
     prefs.customOpenAiModel ||
       (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_OPENAI_COMPATIBLE_MODEL : '') ||
-      DEFAULT_CUSTOM_OPENAI_MODEL
+      ''
   );
   const [customApiVersionInput, setCustomApiVersionInput] = useState(
     prefs.customOpenAiApiVersion ||
       (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_OPENAI_COMPATIBLE_API_VERSION : '') ||
       ''
   );
-  const [selectedCustomPresetId, setSelectedCustomPresetId] = useState<string>('ollama');
 
   const [showKey, setShowKey] = useState(false);
   const [testingKey, setTestingKey] = useState(false);
@@ -250,9 +248,9 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     setTestResult(null);
 
     if (selectedProvider === 'custom') {
-      const cleanBaseUrl = customBaseUrlInput.trim() || DEFAULT_CUSTOM_OPENAI_BASE_URL;
+      const cleanBaseUrl = customBaseUrlInput.trim();
       const cleanKey = customKeyInput.trim();
-      const cleanModel = customModelInput.trim() || DEFAULT_CUSTOM_OPENAI_MODEL;
+      const cleanModel = customModelInput.trim();
       const cleanApiVersion = customApiVersionInput.trim();
 
       setDraftPrefs((prev) => ({
@@ -306,8 +304,17 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     setTestResult(null);
     if (selectedProvider === 'custom') {
       setCustomKeyInput('');
-      setDraftPrefs((prev) => ({ ...prev, customOpenAiApiKey: '' }));
-      setKeySavedMessage(isDraftFa ? 'کلید API سفارشی پاک شد.' : 'Custom API key cleared.');
+      setCustomBaseUrlInput('');
+      setCustomModelInput('');
+      setCustomApiVersionInput('');
+      setDraftPrefs((prev) => ({
+        ...prev,
+        customOpenAiApiKey: '',
+        customOpenAiBaseUrl: '',
+        customOpenAiModel: '',
+        customOpenAiApiVersion: '',
+      }));
+      setKeySavedMessage(isDraftFa ? 'تنظیمات API سفارشی پاک شدند.' : 'Custom API settings cleared.');
     } else if (selectedProvider === 'openrouter') {
       setOpenRouterKeyInput('');
       setDraftPrefs((prev) => ({ ...prev, openRouterApiKey: '' }));
@@ -571,9 +578,9 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     (geminiModelInput.trim() || DEFAULT_GEMINI_MODEL) !== (prefs.geminiModel || DEFAULT_GEMINI_MODEL) ||
     openRouterKeyInput.trim() !== (prefs.openRouterApiKey || '') ||
     (openRouterModelInput.trim() || DEFAULT_OPENROUTER_MODEL) !== (prefs.openRouterModel || DEFAULT_OPENROUTER_MODEL) ||
-    customBaseUrlInput.trim() !== (prefs.customOpenAiBaseUrl || DEFAULT_CUSTOM_OPENAI_BASE_URL) ||
+    customBaseUrlInput.trim() !== (prefs.customOpenAiBaseUrl || '') ||
     customKeyInput.trim() !== (prefs.customOpenAiApiKey || '') ||
-    (customModelInput.trim() || DEFAULT_CUSTOM_OPENAI_MODEL) !== (prefs.customOpenAiModel || DEFAULT_CUSTOM_OPENAI_MODEL) ||
+    customModelInput.trim() !== (prefs.customOpenAiModel || '') ||
     customApiVersionInput.trim() !== (prefs.customOpenAiApiVersion || '') ||
     plannerInstructionsInput.trim() !== (prefs.plannerCustomInstructions || '') ||
     JSON.stringify(currentNavOrder) !== JSON.stringify(initialNavOrder) ||
@@ -587,9 +594,9 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     const cleanGeminiModel = geminiModelInput.trim() || DEFAULT_GEMINI_MODEL;
     const cleanOpenRouterKey = openRouterKeyInput.trim();
     const cleanOpenRouterModel = openRouterModelInput.trim() || DEFAULT_OPENROUTER_MODEL;
-    const cleanCustomBaseUrl = customBaseUrlInput.trim() || DEFAULT_CUSTOM_OPENAI_BASE_URL;
+    const cleanCustomBaseUrl = customBaseUrlInput.trim();
     const cleanCustomKey = customKeyInput.trim();
-    const cleanCustomModel = customModelInput.trim() || DEFAULT_CUSTOM_OPENAI_MODEL;
+    const cleanCustomModel = customModelInput.trim();
     const cleanCustomApiVersion = customApiVersionInput.trim();
     const targetLang = draftPrefs.language || prefs.language || 'en';
     const finalPrefs: UserPreferences = {
@@ -1268,56 +1275,15 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                       <span>{t('settings.providerCustom', 'Custom OpenAI-Compatible API')}</span>
                     </label>
 
-                    {(draftPrefs.customOpenAiApiKey || customKeyInput || customBaseUrlInput !== DEFAULT_CUSTOM_OPENAI_BASE_URL) && (
+                    {(draftPrefs.customOpenAiApiKey || customKeyInput || customBaseUrlInput || customModelInput || customApiVersionInput) && (
                       <button
                         type="button"
                         onClick={handleClearKey}
                         className="text-[11px] text-[#B3261E] dark:text-[#F2B8B5] hover:underline font-medium cursor-pointer"
                       >
-                        {isDraftFa ? 'پاک کردن کلید' : 'Clear key'}
+                        {isDraftFa ? 'پاک کردن تنظیمات' : 'Clear configuration'}
                       </button>
                     )}
-                  </div>
-
-                  {/* Quick Service Presets */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold text-[#151E14] dark:text-[#E8F2E4] block">
-                        {t('settings.presetEndpoints', 'Quick Service Presets')}
-                      </label>
-                      <span className="text-[10px] text-[#556D50] dark:text-[#8EA887]">
-                        {isDraftFa ? 'تنظیم خودکار آدرس و مدل' : 'Auto-fills endpoint & model'}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1.5">
-                      {CUSTOM_OPENAI_PRESETS.map((preset) => {
-                        const isSelected =
-                          selectedCustomPresetId === preset.id ||
-                          customBaseUrlInput.trim().toLowerCase().startsWith(preset.baseUrl.toLowerCase());
-                        return (
-                          <button
-                            key={preset.id}
-                            type="button"
-                            onClick={() => {
-                              soundEngine.playPop();
-                              setSelectedCustomPresetId(preset.id);
-                              setCustomBaseUrlInput(preset.baseUrl);
-                              setCustomModelInput(preset.defaultModel);
-                            }}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer border ${
-                              isSelected
-                                ? 'bg-[#E8F8D8] dark:bg-[#1E3800] border-[#80D141] text-[#1C3700] dark:text-[#80D141] font-bold shadow-2xs scale-[1.02]'
-                                : 'bg-white dark:bg-[#202E1E] hover:bg-[#EDF6E8] dark:hover:bg-[#283A24] border-[#DCEAD4] dark:border-[#2E4229] text-[#3B4E37] dark:text-[#C5DDC0]'
-                            }`}
-                            title={preset.description}
-                          >
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-[#80D141]' : 'bg-transparent'}`} />
-                            <span>{preset.name}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
                   </div>
 
                   <form onSubmit={handleSaveCustomKey} className="space-y-3">
@@ -1328,23 +1294,23 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                           <Server className="w-3.5 h-3.5 text-[#80D141]" />
                           <span>{t('settings.customEndpointLabel', 'API Base URL / Endpoint')}</span>
                         </label>
-                        {isLocalEndpoint(customBaseUrlInput) ? (
+                        {customBaseUrlInput && isLocalEndpoint(customBaseUrlInput) ? (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1C3700] dark:text-[#80D141] border border-[#80D141]/40 flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-[#80D141] animate-pulse" />
-                            {isDraftFa ? 'سرویس محلی (آفلاین / بدون کلید)' : 'Local server (offline / no key needed)'}
+                            {isDraftFa ? 'سرویس محلی (بدون نیاز به کلید)' : 'Local server (no key needed)'}
                           </span>
-                        ) : (
+                        ) : customBaseUrlInput ? (
                           <span className="text-[10px] text-[#556D50] dark:text-[#8EA887]">
                             {isDraftFa ? 'پایانه ابری (نیاز به کلید Bearer)' : 'Cloud endpoint (Bearer key required)'}
                           </span>
-                        )}
+                        ) : null}
                       </div>
 
                       <input
                         type="text"
                         value={customBaseUrlInput}
                         onChange={(e) => setCustomBaseUrlInput(e.target.value)}
-                        placeholder="http://localhost:11434/v1"
+                        placeholder="https://api.openai.com/v1"
                         className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs font-mono text-[#151E14] dark:text-[#E8F2E4] placeholder:font-sans placeholder:text-[#79747E] dark:placeholder:text-[#8D9E8A] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
                       />
                       <p className="text-[10.5px] text-[#485B44] dark:text-[#9EB598]">
@@ -1359,7 +1325,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                           <Key className="w-3.5 h-3.5 text-[#80D141]" />
                           <span>{t('settings.customApiKeyLabel', 'API Key (Optional for Local)')}</span>
                         </label>
-                        {isLocalEndpoint(customBaseUrlInput) && (
+                        {customBaseUrlInput && isLocalEndpoint(customBaseUrlInput) && (
                           <span className="text-[10px] text-[#556D50] dark:text-[#8EA887]">
                             {isDraftFa ? 'اختیاری برای سرورهای محلی' : 'Optional for local servers'}
                           </span>
@@ -1372,8 +1338,8 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                           value={customKeyInput}
                           onChange={(e) => setCustomKeyInput(e.target.value)}
                           placeholder={
-                            isLocalEndpoint(customBaseUrlInput)
-                              ? (isDraftFa ? 'برای Ollama و LM Studio خالی بگذارید' : 'Leave empty for Ollama / LM Studio')
+                            customBaseUrlInput && isLocalEndpoint(customBaseUrlInput)
+                              ? (isDraftFa ? 'اختیاری برای سرورهای محلی' : 'Optional for local servers')
                               : (isDraftFa ? 'کلید API را وارد کنید (Bearer token)' : 'Paste API Key (Bearer token)')
                           }
                           className="w-full pl-3.5 pr-20 py-2.5 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs font-mono text-[#151E14] dark:text-[#E8F2E4] placeholder:font-sans placeholder:text-[#79747E] dark:placeholder:text-[#8D9E8A] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
@@ -1389,59 +1355,19 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                       </div>
                     </div>
 
-                    {/* Model Name with Presets */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-bold text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-1.5">
-                          <Zap className="w-3.5 h-3.5 text-[#80D141]" />
-                          <span>{t('settings.customModelLabel', 'Model Name / ID')}</span>
-                        </label>
-                        <span className="text-[10px] text-[#556D50] dark:text-[#8EA887]">
-                          {t('settings.presetModels', 'Preset Models')}
-                        </span>
-                      </div>
-
-                      {/* Matching Preset Model Chips */}
-                      {(() => {
-                        const activePreset =
-                          CUSTOM_OPENAI_PRESETS.find((p) => p.id === selectedCustomPresetId) ||
-                          CUSTOM_OPENAI_PRESETS.find((p) => customBaseUrlInput.toLowerCase().includes(p.id)) ||
-                          CUSTOM_OPENAI_PRESETS[0];
-                        if (!activePreset || !activePreset.models.length) return null;
-                        return (
-                          <div className="flex flex-wrap gap-1.5">
-                            {activePreset.models.map((model) => {
-                              const isSelected = customModelInput === model.id;
-                              return (
-                                <button
-                                  key={model.id}
-                                  type="button"
-                                  onClick={() => {
-                                    soundEngine.playPop();
-                                    setCustomModelInput(model.id);
-                                  }}
-                                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer border ${
-                                    isSelected
-                                      ? 'bg-[#E8F8D8] dark:bg-[#1E3800] border-[#80D141] text-[#1C3700] dark:text-[#80D141] font-bold shadow-2xs scale-[1.02]'
-                                      : 'bg-white dark:bg-[#202E1E] hover:bg-[#EDF6E8] dark:hover:bg-[#283A24] border-[#DCEAD4] dark:border-[#2E4229] text-[#3B4E37] dark:text-[#C5DDC0]'
-                                  }`}
-                                  title={model.id}
-                                >
-                                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-[#80D141]' : 'bg-transparent'}`} />
-                                  <span>{model.name}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        );
-                      })()}
+                    {/* Model Name */}
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-1.5">
+                        <Zap className="w-3.5 h-3.5 text-[#80D141]" />
+                        <span>{t('settings.customModelLabel', 'Model Name / ID')}</span>
+                      </label>
 
                       <input
                         type="text"
                         value={customModelInput}
                         onChange={(e) => setCustomModelInput(e.target.value)}
-                        placeholder="llama3.2"
-                        className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs font-mono text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+                        placeholder="e.g. gpt-4o, llama3.3, deepseek-chat, mistral-large"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs font-mono text-[#151E14] dark:text-[#E8F2E4] placeholder:font-sans placeholder:text-[#79747E] dark:placeholder:text-[#8D9E8A] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
                       />
                     </div>
 
@@ -1460,28 +1386,14 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                         type="text"
                         value={customApiVersionInput}
                         onChange={(e) => setCustomApiVersionInput(e.target.value)}
-                        placeholder="2024-02-15-preview"
-                        className="w-full px-3.5 py-2 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs font-mono text-[#151E14] dark:text-[#E8F2E4] placeholder:font-sans placeholder:text-[#79747E] dark:placeholder:text-[#8D9E8A] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+                        placeholder="e.g. 2024-02-15-preview"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs font-mono text-[#151E14] dark:text-[#E8F2E4] placeholder:font-sans placeholder:text-[#79747E] dark:placeholder:text-[#8D9E8A] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
                       />
                       <p className="text-[10px] text-[#485B44] dark:text-[#9EB598]">
                         {isDraftFa
                           ? 'سرورهای معمولی OpenAI نیازی به نسخه ندارند. در صورت استفاده از Azure، نسخه API را اینجا بنویسید.'
                           : 'Standard OpenAI & local servers leave this blank. For Azure OpenAI, enter your api-version query string.'}
                       </p>
-                    </div>
-
-                    {/* Environment Variables Reference Info */}
-                    <div className="p-3 rounded-xl bg-[#E8F8D8]/60 dark:bg-[#20341B]/60 border border-[#80D141]/30 text-[10.5px] space-y-1">
-                      <div className="font-bold text-[#1C3700] dark:text-[#80D141] flex items-center gap-1.5">
-                        <Terminal className="w-3.5 h-3.5" />
-                        <span>{isDraftFa ? 'متغیرهای محیطی پشتیبانی‌شده (ENV)' : 'Supported Environment Variables (.env)'}</span>
-                      </div>
-                      <div className="font-mono text-[10px] text-[#344F2D] dark:text-[#BBD5B4] space-y-0.5">
-                        <div><span className="text-[#1C3700] dark:text-[#80D141] font-semibold">VITE_OPENAI_COMPATIBLE_BASE_URL</span>: {customBaseUrlInput || DEFAULT_CUSTOM_OPENAI_BASE_URL}</div>
-                        <div><span className="text-[#1C3700] dark:text-[#80D141] font-semibold">VITE_OPENAI_COMPATIBLE_API_KEY</span>: {customKeyInput ? '••••••••' : '(empty / optional)'}</div>
-                        <div><span className="text-[#1C3700] dark:text-[#80D141] font-semibold">VITE_OPENAI_COMPATIBLE_MODEL</span>: {customModelInput || DEFAULT_CUSTOM_OPENAI_MODEL}</div>
-                        <div><span className="text-[#1C3700] dark:text-[#80D141] font-semibold">VITE_OPENAI_COMPATIBLE_API_VERSION</span>: {customApiVersionInput || '(none)'}</div>
-                      </div>
                     </div>
 
                     <div className="flex items-center gap-2 pt-1">
@@ -1564,7 +1476,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                       <span>{t('settings.testPlaygroundTitle', 'API Key Tester & Query Playground')}</span>
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#E8F8D8] dark:bg-[#23351F] text-[#2C5214] dark:text-[#9DD86A] border border-[#80D141]/40">
                         {selectedProvider === 'custom'
-                          ? `Custom · ${customModelInput || DEFAULT_CUSTOM_OPENAI_MODEL}`
+                          ? `Custom · ${customModelInput || (isDraftFa ? 'مدل سفارشی' : 'custom model')}`
                           : selectedProvider === 'openrouter'
                           ? `OpenRouter · ${openRouterModelInput || DEFAULT_OPENROUTER_MODEL}`
                           : `Gemini · ${geminiModelInput || DEFAULT_GEMINI_MODEL}`}
@@ -1584,7 +1496,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                         </a>
                       ) : selectedProvider === 'custom' ? (
                         <span className="text-[10.5px] font-mono text-[#3B7E10] dark:text-[#80D141]">
-                          {customBaseUrlInput || DEFAULT_CUSTOM_OPENAI_BASE_URL}
+                          {customBaseUrlInput || (isDraftFa ? 'آدرس سفارشی' : 'custom endpoint')}
                         </span>
                       ) : null}
                     </p>

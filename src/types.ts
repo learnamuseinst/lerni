@@ -328,12 +328,12 @@ export function hasActiveAiKey(prefs: UserPreferences): boolean {
     return Boolean(prefs.openRouterApiKey && prefs.openRouterApiKey.trim() !== '');
   }
   if (provider === 'custom') {
-    const baseUrl = prefs.customOpenAiBaseUrl?.trim() || (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_OPENAI_COMPATIBLE_BASE_URL : '') || DEFAULT_CUSTOM_OPENAI_BASE_URL;
-    if (isLocalEndpoint(baseUrl)) {
+    const baseUrl = prefs.customOpenAiBaseUrl?.trim() || (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_OPENAI_COMPATIBLE_BASE_URL : '') || '';
+    const key = prefs.customOpenAiApiKey?.trim() || (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_OPENAI_COMPATIBLE_API_KEY : '') || '';
+    if (baseUrl && isLocalEndpoint(baseUrl)) {
       // Local endpoints like Ollama or LM Studio don't require API keys
       return true;
     }
-    const key = prefs.customOpenAiApiKey?.trim() || (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_OPENAI_COMPATIBLE_API_KEY : '') || '';
     return Boolean(key || baseUrl);
   }
   return Boolean(prefs.geminiApiKey && prefs.geminiApiKey.trim() !== '');
