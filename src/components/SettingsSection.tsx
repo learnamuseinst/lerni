@@ -46,6 +46,7 @@ import {
   Cpu,
   ChevronDown,
   ChevronsUpDown,
+  Smartphone,
 } from 'lucide-react';
 import {
   UserPreferences,
@@ -68,6 +69,7 @@ import { soundEngine } from '../utils/audioSynth';
 import { LerniMascot } from './Mascot/LerniMascot';
 import { useI18n, getCategoryLabel, translations, TranslationKey } from '../utils/i18n';
 import { testAiConnection, testAiPrompt } from '../utils/aiScheduler';
+import { usePwaInstall } from '../utils/usePwaInstall';
 
 interface SettingsSectionProps {
   prefs: UserPreferences;
@@ -206,11 +208,15 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
 
   const selectedProvider: AiProvider = draftPrefs.aiProvider || prefs.aiProvider || 'gemini';
 
+  // PWA install prompt & standalone detection hook
+  const { canInstall, isInstalled, isInstalling, isIos, promptInstall } = usePwaInstall();
+
   // Section accordion state: track which sections are expanded
   // Expandable sections state - keeps the settings clean and uncluttered
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     language: true,
     theme: false,
+    install: false,
     ai: true,
     planner: false,
     navigation: false,
@@ -232,6 +238,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     setExpandedSections({
       language: nextState,
       theme: nextState,
+      install: nextState,
       ai: nextState,
       planner: nextState,
       navigation: nextState,
@@ -246,10 +253,10 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   const [plannerInstructionsInput, setPlannerInstructionsInput] = useState(prefs.plannerCustomInstructions || '');
   const [instructionsSavedMessage, setInstructionsSavedMessage] = useState<string | null>(null);
 
-  // Active language in current session; language only changes when user clicks Save
-  const isFa = language === 'fa';
-  const isDraftFa = isFa;
+  // Active language in current session and draft preview
   const selectedLanguage: Language = draftPrefs.language || language || 'en';
+  const isDraftFa = selectedLanguage === 'fa';
+  const isFa = language === 'fa';
 
   // Update language in draft preferences only; does not apply until user clicks Save
   const handleLanguageChange = (newLang: Language) => {
@@ -866,15 +873,35 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={toggleAllSections}
-            className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-[#3B7E10] dark:text-[#80D141] bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] dark:hover:bg-[#283A23] border border-[#D8E8D0] dark:border-[#273722] flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-            title={allExpanded ? (isDraftFa ? 'بستن همه بخش‌ها' : 'Collapse All Sections') : (isDraftFa ? 'باز کردن همه بخش‌ها' : 'Expand All Sections')}
-          >
-            <ChevronsUpDown className="w-3.5 h-3.5" />
-            <span>{allExpanded ? (isDraftFa ? 'بستن همه' : 'Collapse All') : (isDraftFa ? 'باز کردن همه' : 'Expand All')}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {!isInstalled && (
+              <button
+                type="button"
+                id="btn-settings-header-install"
+                onClick={promptInstall}
+                disabled={isInstalling}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-[#0F2600] bg-[#80D141] hover:bg-[#72BF36] disabled:opacity-50 border border-[#80D141] flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-95"
+                title={isDraftFa ? 'نصب لرنی به عنوان برنامه مستقل روی دستگاه' : 'Install Lerni as a native app on your device'}
+              >
+                <Download className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>
+                  {isInstalling
+                    ? (isDraftFa ? 'در حال نصب...' : 'Installing...')
+                    : (isDraftFa ? 'نصب برنامه' : 'Install App')}
+                </span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={toggleAllSections}
+              className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-[#3B7E10] dark:text-[#80D141] bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] dark:hover:bg-[#283A23] border border-[#D8E8D0] dark:border-[#273722] flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+              title={allExpanded ? (isDraftFa ? 'بستن همه بخش‌ها' : 'Collapse All Sections') : (isDraftFa ? 'باز کردن همه بخش‌ها' : 'Expand All Sections')}
+            >
+              <ChevronsUpDown className="w-3.5 h-3.5" />
+              <span>{allExpanded ? (isDraftFa ? 'بستن همه' : 'Collapse All') : (isDraftFa ? 'باز کردن همه' : 'Expand All')}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1061,6 +1088,161 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                         <span>{t('settings.themeLight', 'Gentle Light')}</span>
                       </button>
                     </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </section>
+
+          {/* Feature: Install Application (PWA - Expandable) */}
+          <section id="section-settings-install" className="rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm transition-all duration-200 overflow-hidden">
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => toggleSection('install')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  toggleSection('install');
+                }
+              }}
+              aria-expanded={expandedSections['install']}
+              className="w-full p-4 sm:p-5 flex items-center justify-between text-start gap-3 hover:bg-[#F9FAF6] dark:hover:bg-[#1C2819] transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center text-[#234A00] dark:text-[#80D141] shrink-0 group-hover:scale-105 transition-transform">
+                  <Smartphone className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                      {t('settings.installAppSection', 'Install Application')}
+                    </h3>
+                    {isInstalled ? (
+                      <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>{isDraftFa ? 'نصب شده' : 'Installed'}</span>
+                      </span>
+                    ) : canInstall ? (
+                      <span className="text-[11px] font-semibold text-[#3B7E10] dark:text-[#80D141] px-2 py-0.5 rounded-full bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/30">
+                        {isDraftFa ? 'آماده نصب' : 'Ready to Install'}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-semibold text-[#485B44] dark:text-[#9EB598] px-2 py-0.5 rounded-full bg-[#EDF6E8] dark:bg-[#1E2B1A] border border-[#D8E8D0] dark:border-[#273722]">
+                        {isDraftFa ? 'وب‌اپلیکیشن' : 'Web App'}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[#485B44] dark:text-[#9EB598] truncate">
+                    {t('settings.installAppDesc', 'Install Lerni as a native app on your phone, tablet, or desktop')}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {!isInstalled && (
+                  <button
+                    type="button"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      await promptInstall();
+                    }}
+                    disabled={isInstalling || (!canInstall && !isIos)}
+                    className="px-2.5 py-1 rounded-full text-xs font-bold text-[#0F2600] bg-[#80D141] hover:bg-[#72BF36] disabled:opacity-40 border border-[#80D141] flex items-center gap-1 transition-colors cursor-pointer"
+                    title={isDraftFa ? 'نصب برنامه' : 'Install App'}
+                  >
+                    <Download className="w-3 h-3 stroke-[2.5]" />
+                    <span className="hidden sm:inline">
+                      {isInstalling
+                        ? (isDraftFa ? 'در حال نصب...' : 'Installing...')
+                        : (isDraftFa ? 'نصب برنامه' : 'Install App')}
+                    </span>
+                  </button>
+                )}
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-[#485B44] dark:text-[#9EB598] group-hover:text-[#151E14] dark:group-hover:text-[#E8F2E4] group-hover:bg-[#EDF6E8] dark:group-hover:bg-[#202E1E] transition-colors">
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expandedSections['install'] ? 'rotate-180' : ''}`} />
+                </div>
+              </div>
+            </div>
+
+            <AnimatePresence initial={false}>
+              {expandedSections['install'] && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22, ease: 'easeInOut' }}
+                >
+                  <div className="px-5 pb-5 sm:px-6 sm:pb-6 pt-2 border-t border-[#DCEAD4]/80 dark:border-[#263722] space-y-4">
+                    <p className="text-xs text-[#485B44] dark:text-[#9EB598] leading-relaxed">
+                      {t('settings.installAppDesc', 'Install Lerni as a native app on your phone, tablet, or desktop for instant access and distraction-free offline use.')}
+                    </p>
+
+                    {isInstalled ? (
+                      <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-800 text-xs font-medium text-emerald-900 dark:text-emerald-200 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                        </div>
+                        <div>
+                          <div className="font-bold text-sm text-emerald-950 dark:text-emerald-100">
+                            {isDraftFa ? 'برنامه نصب شده و آماده استفاده است' : 'Application Installed & Running'}
+                          </div>
+                          <div className="text-[11px] opacity-80 mt-0.5">
+                            {t('settings.appInstalledDesc', 'Lerni is running as an installed standalone application on this device.')}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="p-3.5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] flex items-center justify-between gap-3 flex-wrap">
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                              {isDraftFa ? 'افزودن به صفحه اصلی و برنامه‌ها' : 'Add to Home Screen & Apps'}
+                            </div>
+                            <div className="text-[11px] text-[#485B44] dark:text-[#9EB598] mt-0.5">
+                              {t('settings.installReadyDesc', 'Tap the button below to add Lerni to your home screen or desktop application launcher.')}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            id="btn-settings-install-app-main"
+                            onClick={promptInstall}
+                            disabled={isInstalling || (!canInstall && !isIos)}
+                            className="px-5 py-2.5 rounded-2xl bg-[#80D141] hover:bg-[#72BF36] disabled:opacity-50 text-[#0F2600] text-xs font-bold shadow-xs flex items-center gap-2 transition-all cursor-pointer active:scale-95 shrink-0"
+                          >
+                            <Download className="w-4 h-4 stroke-[2.5]" />
+                            <span>
+                              {isInstalling
+                                ? t('settings.installing', 'Installing...')
+                                : t('settings.installBtn', 'Install App')}
+                            </span>
+                          </button>
+                        </div>
+
+                        {isIos ? (
+                          <div className="p-3.5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] text-xs text-[#3B4E37] dark:text-[#A6BC9F] flex items-start gap-2.5">
+                            <span className="text-base shrink-0">📱</span>
+                            <div className="text-[11px] leading-relaxed">
+                              <span className="font-bold text-[#151E14] dark:text-[#E8F2E4] block mb-0.5">
+                                {isDraftFa ? 'راهنمای نصب در آیفون و آی‌پد (iOS):' : 'Installation on iOS (iPhone / iPad):'}
+                              </span>
+                              {t('settings.installManualIos', 'To install on iOS: Tap the Share button in Safari (⎙ / ⎋) and select "Add to Home Screen".')}
+                            </div>
+                          </div>
+                        ) : !canInstall ? (
+                          <div className="p-3.5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] text-xs text-[#3B4E37] dark:text-[#A6BC9F] flex items-start gap-2.5">
+                            <span className="text-base shrink-0">💡</span>
+                            <div className="text-[11px] leading-relaxed">
+                              <span className="font-bold text-[#151E14] dark:text-[#E8F2E4] block mb-0.5">
+                                {isDraftFa ? 'نصب دستی از طریق مرورگر:' : 'Manual Browser Installation:'}
+                              </span>
+                              {t('settings.installManualGeneral', 'To install Lerni: Open your browser menu (⋮ or ⋯) and select "Install Lerni" or "Add to Home screen".')}
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -2017,9 +2199,16 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
         <div className="lg:col-span-5 space-y-6">
           {/* Feature 1: Reorder Navigation Sections */}
           <section id="section-settings-navigation" className="rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm transition-all duration-200 overflow-hidden">
-            <button
-              type="button"
+            <div
+              role="button"
+              tabIndex={0}
               onClick={() => toggleSection('navigation')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  toggleSection('navigation');
+                }
+              }}
               aria-expanded={expandedSections['navigation']}
               className="w-full p-4 sm:p-5 flex items-center justify-between text-start gap-3 hover:bg-[#F9FAF6] dark:hover:bg-[#1C2819] transition-colors cursor-pointer group"
             >
@@ -2059,7 +2248,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                   <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expandedSections['navigation'] ? 'rotate-180' : ''}`} />
                 </div>
               </div>
-            </button>
+            </div>
 
             <AnimatePresence initial={false}>
               {expandedSections['navigation'] && (
@@ -2138,9 +2327,16 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
 
           {/* Feature: Timer Tabs Reordering (Focus vs Tracker - Expandable) */}
           <section id="section-settings-timer-tabs" className="rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm transition-all duration-200 overflow-hidden">
-            <button
-              type="button"
+            <div
+              role="button"
+              tabIndex={0}
               onClick={() => toggleSection('focus')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  toggleSection('focus');
+                }
+              }}
               aria-expanded={expandedSections['focus']}
               className="w-full p-4 sm:p-5 flex items-center justify-between text-start gap-3 hover:bg-[#F9FAF6] dark:hover:bg-[#1C2819] transition-colors cursor-pointer group"
             >
@@ -2180,7 +2376,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                   <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expandedSections['focus'] ? 'rotate-180' : ''}`} />
                 </div>
               </div>
-            </button>
+            </div>
 
             <AnimatePresence initial={false}>
               {expandedSections['focus'] && (
@@ -2266,9 +2462,16 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
 
           {/* Feature 2: Journal Categories Customization (Expandable) */}
           <section id="section-settings-categories" className="rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm transition-all duration-200 overflow-hidden">
-            <button
-              type="button"
+            <div
+              role="button"
+              tabIndex={0}
               onClick={() => toggleSection('categories')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  toggleSection('categories');
+                }
+              }}
               aria-expanded={expandedSections['categories']}
               className="w-full p-4 sm:p-5 flex items-center justify-between text-start gap-3 hover:bg-[#F9FAF6] dark:hover:bg-[#1C2819] transition-colors cursor-pointer group"
             >
@@ -2308,7 +2511,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                   <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expandedSections['categories'] ? 'rotate-180' : ''}`} />
                 </div>
               </div>
-            </button>
+            </div>
 
             <AnimatePresence initial={false}>
               {expandedSections['categories'] && (
@@ -2376,9 +2579,16 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
 
           {/* Audio & Sensory Feedback (Expandable) */}
           <section id="section-settings-audio" className="rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm transition-all duration-200 overflow-hidden">
-            <button
-              type="button"
+            <div
+              role="button"
+              tabIndex={0}
               onClick={() => toggleSection('audio')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  toggleSection('audio');
+                }
+              }}
               aria-expanded={expandedSections['audio']}
               className="w-full p-4 sm:p-5 flex items-center justify-between text-start gap-3 hover:bg-[#F9FAF6] dark:hover:bg-[#1C2819] transition-colors cursor-pointer group"
             >
@@ -2418,7 +2628,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                   <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expandedSections['audio'] ? 'rotate-180' : ''}`} />
                 </div>
               </div>
-            </button>
+            </div>
 
             <AnimatePresence initial={false}>
               {expandedSections['audio'] && (

@@ -675,6 +675,15 @@ export const translations = {
     'settings.cleanSuccess': 'Workspace cleaned! All sample data has been cleared and your companion is ready to start fresh.',
     'settings.resetConfirmDesc': 'Restore sample habits, tasks, projects, and journal entries so you can explore all Lerni companion features? Your settings and API keys will remain untouched.',
     'settings.resetSuccess': 'Demo data restored! Sample tasks, habits, and journal entries are ready to explore.',
+    'settings.installAppSection': 'Install Application',
+    'settings.installAppDesc': 'Install Lerni as a native app on your phone, tablet, or desktop for instant access and distraction-free offline use.',
+    'settings.installBtn': 'Install App',
+    'settings.installing': 'Installing...',
+    'settings.appInstalled': 'Installed',
+    'settings.appInstalledDesc': 'Lerni is running as an installed standalone application on this device.',
+    'settings.installReadyDesc': 'Tap the button below to add Lerni to your home screen or desktop application launcher.',
+    'settings.installManualIos': 'To install on iOS: Tap the Share button in Safari (⎙ / ⎋) and select "Add to Home Screen".',
+    'settings.installManualGeneral': 'To install Lerni: Open your browser menu (⋮ or ⋯) and select "Install Lerni" or "Add to Home screen".',
   },
 
   fa: {
@@ -1348,6 +1357,15 @@ export const translations = {
     'settings.cleanSuccess': 'محیط کار تمیز شد! همه موارد نمونه پاک شدند و لرنی آماده شروع با داده‌های شماست.',
     'settings.resetConfirmDesc': 'آیا مایلید تمام عادت‌ها، تسک‌ها، پروژه‌ها و یادداشت‌های نمونه را بازیابی کنید؟ تنظیمات و کلیدهای هوش مصنوعی شما حفظ خواهند شد.',
     'settings.resetSuccess': 'اطلاعات نمونه با موفقیت بازیابی شدند! تسک‌ها، عادت‌ها و یادداشت‌های آزمایشی آماده استفاده هستند.',
+    'settings.installAppSection': 'نصب برنامه (PWA)',
+    'settings.installAppDesc': 'نصب لرنی به عنوان یک برنامه مستقل روی گوشی، تبلت یا رایانه برای دسترسی آنی، کارکرد آفلاین و محیط بدون حواس‌پرتی.',
+    'settings.installBtn': 'نصب برنامه',
+    'settings.installing': 'در حال نصب...',
+    'settings.appInstalled': 'نصب شده',
+    'settings.appInstalledDesc': 'لرنی به عنوان یک اپلیکیشن مستقل روی این دستگاه نصب و در حال اجرا است.',
+    'settings.installReadyDesc': 'برای افزودن لرنی به صفحه اصلی یا فهرست برنامه‌های دستگاه، روی دکمه زیر بزنید.',
+    'settings.installManualIos': 'برای نصب در آیفون/آی‌پد (iOS): در سافاری دکمه همرسانی (Share ⎙) را بزنید و گزینه «Add to Home Screen» (افزودن به صفحه اصلی) را انتخاب کنید.',
+    'settings.installManualGeneral': 'برای نصب لرنی: منوی مرورگر خود (⋮ یا ⋯) را باز کرده و گزینه «نصب برنامه» یا «افزودن به صفحه اصلی» (Add to Home screen) را انتخاب کنید.',
   }
 };
 
