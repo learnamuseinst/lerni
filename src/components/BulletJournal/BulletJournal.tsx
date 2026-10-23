@@ -23,9 +23,10 @@ import {
   ChevronRight,
   CalendarDays,
   CalendarRange,
-  ChevronDown
+  ChevronDown,
+  Bell
 } from 'lucide-react';
-import { BujoEntry, BujoType, BujoStatus, EnergyLevel, ENERGY_LEVELS } from '../../types';
+import { BujoEntry, BujoType, BujoStatus, EnergyLevel, ENERGY_LEVELS, EntryReminder } from '../../types';
 import { soundEngine } from '../../utils/audioSynth';
 import { 
   getTodayKey, 
@@ -39,6 +40,7 @@ import { AddBujoModal } from './AddBujoModal';
 import { EditBujoModal } from './EditBujoModal';
 import { UnstickModal, getLocalizedTaskTitle } from '../UnstickModal';
 import { MaterialExpressiveDatePicker } from '../common/MaterialExpressiveDatePicker';
+import { QuickReminderModal } from '../common/QuickReminderModal';
 
 interface BulletJournalProps {
   entries: BujoEntry[];
@@ -74,6 +76,7 @@ export const BulletJournal: React.FC<BulletJournalProps> = ({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<BujoEntry | null>(null);
   const [unstickEntry, setUnstickEntry] = useState<BujoEntry | null>(null);
+  const [reminderTargetEntry, setReminderTargetEntry] = useState<BujoEntry | null>(null);
 
   // Listen for unified FAB click from App
   useEffect(() => {
@@ -604,6 +607,26 @@ export const BulletJournal: React.FC<BulletJournalProps> = ({
         onOpenSettings={onOpenSettings}
       />
 
+      {/* Quick Reminder Modal */}
+      <QuickReminderModal
+        isOpen={Boolean(reminderTargetEntry)}
+        onClose={() => setReminderTargetEntry(null)}
+        title={reminderTargetEntry?.content || ''}
+        itemType={reminderTargetEntry?.type || 'task'}
+        targetTime={reminderTargetEntry?.time}
+        targetDate={reminderTargetEntry?.date}
+        reminders={reminderTargetEntry?.reminders || []}
+        onSave={(updatedReminders) => {
+          if (!reminderTargetEntry) return;
+          const updated = entries.map((e) =>
+            e.id === reminderTargetEntry.id
+              ? { ...e, reminders: updatedReminders.length > 0 ? updatedReminders : undefined }
+              : e
+          );
+          onUpdateEntries(updated);
+        }}
+      />
+
     </div>
   );
 
@@ -729,6 +752,31 @@ export const BulletJournal: React.FC<BulletJournalProps> = ({
                   </span>
                 )}
 
+                {/* Reminder Badge */}
+                {entry.reminders && entry.reminders.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      soundEngine.playPop();
+                      setReminderTargetEntry(entry);
+                    }}
+                    className={`px-2 py-0.5 rounded-full text-[11px] font-bold inline-flex items-center gap-1 shrink-0 cursor-pointer hover:scale-105 transition-transform ${
+                      isCompleted
+                        ? 'bg-[#CCEBB6] dark:bg-[#254A20] text-[#14300B] dark:text-[#CFF3B8]'
+                        : 'bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1C3700] dark:text-[#80D141] border border-[#80D141]/40 shadow-2xs'
+                    }`}
+                    title={language === 'fa' ? 'مدیریت یادآورها' : 'Manage reminders'}
+                  >
+                    <Bell className="w-3 h-3 fill-current" />
+                    <span>
+                      {language === 'fa'
+                        ? `${toPersianDigits(entry.reminders.length)} یادآور`
+                        : `${entry.reminders.length} reminder${entry.reminders.length > 1 ? 's' : ''}`}
+                    </span>
+                  </button>
+                )}
+
                 {isMigrated && (
                   <span className="text-amber-600 dark:text-amber-400 font-bold">
                     {t('journal.migrated')}
@@ -819,6 +867,25 @@ export const BulletJournal: React.FC<BulletJournalProps> = ({
                   >
                     <Star className={`w-4 h-4 ${entry.isPriority ? 'fill-current' : ''}`} />
                   </button>
+
+                  {/* Quick Reminder Toggle */}
+                  {(entry.type === 'task' || entry.type === 'event') && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundEngine.playPop();
+                        setReminderTargetEntry(entry);
+                      }}
+                      className={`p-1.5 rounded-full transition-all cursor-pointer ${
+                        entry.reminders && entry.reminders.length > 0
+                          ? 'text-[#2C690F] dark:text-[#9DD97A] bg-[#E8F8D8] dark:bg-[#1E3800]'
+                          : 'text-[#485B44] dark:text-[#9EB598] hover:text-[#151E14] dark:hover:text-[#E8F2E4] hover:bg-[#EDF6E8] dark:hover:bg-[#202E1E]'
+                      }`}
+                      title={language === 'fa' ? 'تنظیم یادآور' : 'Set reminder'}
+                    >
+                      <Bell className={`w-4 h-4 ${entry.reminders && entry.reminders.length > 0 ? 'fill-current' : ''}`} />
+                    </button>
+                  )}
 
                   {/* Edit */}
                   <button

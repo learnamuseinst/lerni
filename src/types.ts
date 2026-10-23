@@ -11,6 +11,15 @@ export const ENERGY_LEVELS: { id: EnergyLevel; label: string; icon: string; name
 
 export type TimeBucket = 'morning' | 'midday' | 'evening' | 'anytime';
 
+export interface EntryReminder {
+  id: string;
+  // Offset in minutes before the target time (0 = at the time, 5 = 5m before, 15 = 15m before, etc.)
+  offsetMinutes: number;
+  customTime?: string; // Optional HH:mm if specific time of day is chosen
+  label?: string; // Optional custom title/label
+  enabled?: boolean; // Defaults to true
+}
+
 export interface Habit {
   id: string;
   title: string;
@@ -28,6 +37,7 @@ export interface Habit {
   totalCompletions: number;
   unstickTip?: string; // Low barrier fallback prompt
   isArchived?: boolean;
+  reminders?: EntryReminder[];
 }
 
 export function isHabitActiveOnDate(habit: Habit, dateStr: string): boolean {
@@ -68,6 +78,7 @@ export interface BujoEntry {
   linkedHabitId?: string;
   createdAt: number;
   completedAt?: number;
+  reminders?: EntryReminder[];
 }
 
 export type FocusTimerMode = 'sprint_5' | 'burst_15' | 'pomodoro_25' | 'deep_45' | 'flowmodoro' | 'custom';
@@ -315,6 +326,8 @@ export interface UserPreferences {
   customOpenAiApiVersion?: string; // Optional API version (e.g. for Azure)
   useSharedFreeKey?: boolean; // Whether the user uses the shared community free API key
   plannerCustomInstructions?: string; // Persistent custom instructions for smart planner
+  reminderNotificationsEnabled?: boolean; // Whether browser notifications are active
+  reminderSoundEnabled?: boolean; // Whether reminder chime is enabled
 }
 
 export function isLocalEndpoint(url?: string): boolean {

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Plus, Sparkles, Clock, Zap, ArrowLeft, CalendarDays } from 'lucide-react';
-import { Habit, EnergyLevel, TimeBucket, ENERGY_LEVELS } from '../../types';
+import { Habit, EnergyLevel, TimeBucket, ENERGY_LEVELS, EntryReminder } from '../../types';
 import { getTodayDateString } from '../../utils/storage';
 import { soundEngine } from '../../utils/audioSynth';
 import { useI18n, getEnergyLabel } from '../../utils/i18n';
 import { MaterialExpressiveTimePicker } from '../common/MaterialExpressiveTimePicker';
+import { ReminderPicker } from '../common/ReminderPicker';
 
 interface AddHabitModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose, o
   const [durationMinutes, setDurationMinutes] = useState<string>('');
   const [activeDays, setActiveDays] = useState<number[]>(ALL_DAYS);
   const [energyCost, setEnergyCost] = useState<EnergyLevel>('low');
+  const [reminders, setReminders] = useState<EntryReminder[]>([]);
 
   const dayOptions = isFa
     ? [
@@ -95,6 +97,7 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose, o
       completedDates: [],
       streakCount: 0,
       totalCompletions: 0,
+      reminders: reminders.length > 0 ? reminders : undefined,
     };
 
     onAddHabit(newHabit);
@@ -103,6 +106,7 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose, o
     setTargetTime('');
     setDurationMinutes('');
     setActiveDays(ALL_DAYS);
+    setReminders([]);
     onClose();
   };
 
@@ -409,6 +413,16 @@ export const AddHabitModal: React.FC<AddHabitModalProps> = ({ isOpen, onClose, o
           <p className="text-[10px] text-[#485B44] dark:text-[#9EB598] -mt-1">
             💡 {t('habits.smartPlannerNote', 'Used by the Smart Planner to place this habit into your daily schedule')}
           </p>
+
+          {/* Reminders & Notifications Section */}
+          <div className="pt-3 border-t border-[#DCEAD4] dark:border-[#263722]">
+            <ReminderPicker
+              reminders={reminders}
+              onChange={setReminders}
+              targetTime={targetTime}
+              itemType="habit"
+            />
+          </div>
 
             </div>
           </div>

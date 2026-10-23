@@ -109,13 +109,19 @@ const DEFAULT_BUJO: BujoEntry[] = [
   {
     id: 'bujo-2',
     date: getTodayDateString(),
+    time: '15:00',
+    durationMinutes: 45,
     type: 'event',
     status: 'open',
-    content: '3:00 PM Focus sprint with body double',
+    content: 'Focus sprint with body double',
     energyCost: 'low',
     category: 'Work',
     tags: ['Calendar'],
-    createdAt: Date.now() - 3600000 * 3
+    createdAt: Date.now() - 3600000 * 3,
+    reminders: [
+      { id: 'rem-b2-1', offsetMinutes: 30, enabled: true },
+      { id: 'rem-b2-2', offsetMinutes: 0, enabled: true }
+    ]
   },
   {
     id: 'bujo-3',
@@ -324,6 +330,8 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   customOpenAiApiVersion: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_OPENAI_COMPATIBLE_API_VERSION) || '',
   useSharedFreeKey: true,
   plannerCustomInstructions: '',
+  reminderNotificationsEnabled: true,
+  reminderSoundEnabled: true,
 };
 
 const STORAGE_KEYS = {

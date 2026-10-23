@@ -22,6 +22,8 @@ import { SettingsSection } from './components/SettingsSection';
 import { ParalysisBusterModal } from './components/ParalysisBusterModal';
 import { GroundingModal } from './components/GroundingModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import { checkAndTriggerDueReminders, ActiveReminderAlert } from './utils/reminderManager';
+import { ReminderToastBanner } from './components/common/ReminderToastBanner';
 
 export default function App() {
   const [prefs, setPrefs] = useState<UserPreferences>(() => storage.getPreferences());
@@ -45,6 +47,72 @@ export default function App() {
   const [isGroundingOpen, setIsGroundingOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
+
+  // Active in-app reminder alerts
+  const [activeAlerts, setActiveAlerts] = useState<ActiveReminderAlert[]>([]);
+
+  // Background check for scheduled reminders across tasks, events, and habits
+  useEffect(() => {
+    const checkReminders = () => {
+      checkAndTriggerDueReminders(bujoEntries, habits, prefs, (alert) => {
+        setActiveAlerts((prev) => {
+          if (prev.some((a) => a.id === alert.id)) return prev;
+          return [alert, ...prev];
+        });
+      });
+    };
+
+    checkReminders();
+    const intervalId = setInterval(checkReminders, 12000);
+
+    const handleFocus = () => checkReminders();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [bujoEntries, habits, prefs]);
+
+  const handleDismissAlert = (alertId: string) => {
+    setActiveAlerts((prev) => prev.filter((a) => a.id !== alertId));
+  };
+
+  const handleSnoozeAlert = (alert: ActiveReminderAlert, minutes: number = 5) => {
+    setTimeout(() => {
+      const isFa = prefs.language === 'fa';
+      const snoozedAlert: ActiveReminderAlert = {
+        ...alert,
+        id: `snooze-${alert.id}-${Date.now()}`,
+        reminderLabel: isFa ? `به تعویق افتاده (${minutes} دقیقه)` : `Snoozed (${minutes}m)`,
+        triggeredAt: Date.now(),
+      };
+      if (prefs.reminderSoundEnabled !== false && prefs.soundEffectsEnabled !== false) {
+        soundEngine.playGentleChime();
+      }
+      setActiveAlerts((prev) => [snoozedAlert, ...prev]);
+    }, minutes * 60 * 1000);
+  };
+
+  const handleCompleteItemFromReminder = (entryId: string, entryType: 'task' | 'event' | 'habit') => {
+    if (entryType === 'task' || entryType === 'event') {
+      const updated = bujoEntries.map((e) =>
+        e.id === entryId ? { ...e, status: 'done' as const } : e
+      );
+      handleUpdateBujoEntries(updated);
+    } else if (entryType === 'habit') {
+      const todayStr = getTodayDateString();
+      const updated = habits.map((h) => {
+        if (h.id === entryId) {
+          const history = { ...(h.completionHistory || {}) };
+          history[todayStr] = true;
+          return { ...h, completionHistory: history };
+        }
+        return h;
+      });
+      handleUpdateHabits(updated);
+    }
+  };
 
   // Listen for section full-screen modal state changes to hide/show FAB smoothly
   useEffect(() => {
@@ -333,6 +401,8 @@ export default function App() {
                       const fallback = (prefs.navOrder && prefs.navOrder[0]) ? prefs.navOrder[0] : 'planner';
                       setActiveSection(previousSection !== 'settings' ? previousSection : fallback);
                     }}
+                    bujoEntries={bujoEntries}
+                    habits={habits}
                   />
                 </motion.div>
               )}
@@ -419,6 +489,14 @@ export default function App() {
 
         {/* Offline Status & PWA Install Prompt Indicator */}
         <OfflineIndicator />
+
+        {/* Floating Toast Alert Banner for Due Reminders */}
+        <ReminderToastBanner
+          alerts={activeAlerts}
+          onDismiss={handleDismissAlert}
+          onSnooze={handleSnoozeAlert}
+          onCompleteItem={handleCompleteItemFromReminder}
+        />
 
       </div>
     </I18nProvider>

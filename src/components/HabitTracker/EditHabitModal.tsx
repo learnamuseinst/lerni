@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Check, Zap, Sun, Clock, Moon, Sparkles, Heart, HelpCircle, CalendarDays } from 'lucide-react';
-import { Habit, EnergyLevel, TimeBucket, ENERGY_LEVELS } from '../../types';
+import { Habit, EnergyLevel, TimeBucket, ENERGY_LEVELS, EntryReminder } from '../../types';
 import { soundEngine } from '../../utils/audioSynth';
 import { useI18n, getEnergyLabel } from '../../utils/i18n';
 import { MaterialExpressiveTimePicker } from '../common/MaterialExpressiveTimePicker';
+import { ReminderPicker } from '../common/ReminderPicker';
 
 interface EditHabitModalProps {
   habit: Habit | null;
@@ -31,6 +32,7 @@ export const EditHabitModal: React.FC<EditHabitModalProps> = ({
   const [energyCost, setEnergyCost] = useState<EnergyLevel>('low');
   const [unstickTip, setUnstickTip] = useState('');
   const [showUnstickHelp, setShowUnstickHelp] = useState(false);
+  const [reminders, setReminders] = useState<EntryReminder[]>([]);
 
   const dayOptions = isFa
     ? [
@@ -81,6 +83,7 @@ export const EditHabitModal: React.FC<EditHabitModalProps> = ({
       );
       setEnergyCost(habit.energyCost);
       setUnstickTip(habit.unstickTip || '');
+      setReminders(habit.reminders || []);
       setShowUnstickHelp(false);
     }
   }, [habit, isOpen]);
@@ -114,6 +117,7 @@ export const EditHabitModal: React.FC<EditHabitModalProps> = ({
       activeDays: normalizedDays,
       energyCost,
       unstickTip: unstickTip.trim() || undefined,
+      reminders: reminders.length > 0 ? reminders : undefined,
     };
 
     onSave(updated);
@@ -451,6 +455,16 @@ export const EditHabitModal: React.FC<EditHabitModalProps> = ({
             onChange={(e) => setUnstickTip(e.target.value)}
             placeholder="e.g. Just take 1 single sip. Stopping is 100% fine."
             className="w-full px-3 py-2 rounded-xl bg-white dark:bg-[#182316] border border-[#80D141]/50 text-xs text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+          />
+        </div>
+
+        {/* Reminders & Notifications Section */}
+        <div className="pt-3 border-t border-[#DCEAD4] dark:border-[#263722]">
+          <ReminderPicker
+            reminders={reminders}
+            onChange={setReminders}
+            targetTime={targetTime}
+            itemType="habit"
           />
         </div>
 

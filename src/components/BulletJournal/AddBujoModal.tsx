@@ -12,13 +12,14 @@ import {
   Settings,
   ArrowLeft
 } from 'lucide-react';
-import { BujoEntry, BujoType, EnergyLevel, ENERGY_LEVELS } from '../../types';
+import { BujoEntry, BujoType, EnergyLevel, ENERGY_LEVELS, EntryReminder } from '../../types';
 import { soundEngine } from '../../utils/audioSynth';
 import { getTodayKey } from '../../utils/dateUtils';
 import { DEFAULT_JOURNAL_CATEGORIES } from '../../utils/storage';
 import { useI18n, getCategoryLabel, getEnergyLabel } from '../../utils/i18n';
 import { MaterialExpressiveDatePicker } from '../common/MaterialExpressiveDatePicker';
 import { MaterialExpressiveTimePicker } from '../common/MaterialExpressiveTimePicker';
+import { ReminderPicker } from '../common/ReminderPicker';
 
 interface AddBujoModalProps {
   isOpen: boolean;
@@ -57,6 +58,7 @@ export const AddBujoModal: React.FC<AddBujoModalProps> = ({
   const [energyCost, setEnergyCost] = useState<EnergyLevel>(currentEnergy);
   const [isPriority, setIsPriority] = useState(false);
   const [category, setCategory] = useState<string>(availableCategories[0] || 'General');
+  const [reminders, setReminders] = useState<EntryReminder[]>([]);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -68,6 +70,7 @@ export const AddBujoModal: React.FC<AddBujoModalProps> = ({
       setDurationMinutes('');
       setContent('');
       setIsPriority(false);
+      setReminders([]);
       if (!availableCategories.includes(category)) {
         setCategory(availableCategories[0] || 'General');
       }
@@ -103,6 +106,7 @@ export const AddBujoModal: React.FC<AddBujoModalProps> = ({
       category: category.trim() || availableCategories[0] || 'General',
       tags: [category.trim() || availableCategories[0] || 'General'],
       createdAt: Date.now(),
+      reminders: reminders.length > 0 ? reminders : undefined,
     };
 
     onAddEntry(newEntry);
@@ -460,6 +464,19 @@ export const AddBujoModal: React.FC<AddBujoModalProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Reminders & Notifications Section (for Tasks and Events) */}
+        {(type === 'task' || type === 'event') && (
+          <div className="pt-3 border-t border-[#DCEAD4] dark:border-[#263722]">
+            <ReminderPicker
+              reminders={reminders}
+              onChange={setReminders}
+              targetTime={targetTime}
+              targetDate={targetDate}
+              itemType={type}
+            />
+          </div>
+        )}
 
       </div>
     </div>

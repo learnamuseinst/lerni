@@ -255,6 +255,36 @@ class SoundEngine {
       osc.stop(now + 0.09);
     } catch (e) {}
   }
+
+  public playReminderAlert() {
+    if (!this.effectsEnabled) return;
+    try {
+      this.initContext();
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      // Friendly, gentle arpeggio alert: F#4 -> A4 -> C#5 -> E5
+      const freqs = [369.99, 440.00, 554.37, 659.25];
+      freqs.forEach((freq, idx) => {
+        const osc = this.ctx!.createOscillator();
+        const noteGain = this.ctx!.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + idx * 0.1);
+
+        noteGain.gain.setValueAtTime(0.001, now + idx * 0.1);
+        noteGain.gain.exponentialRampToValueAtTime(0.22, now + idx * 0.1 + 0.02);
+        noteGain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.1 + 0.9);
+
+        osc.connect(noteGain);
+        noteGain.connect(this.ctx!.destination);
+
+        osc.start(now + idx * 0.1);
+        osc.stop(now + idx * 0.1 + 0.95);
+      });
+    } catch (e) {
+      console.warn("Audio reminder alert error:", e);
+    }
+  }
 }
 
 export const soundEngine = new SoundEngine();

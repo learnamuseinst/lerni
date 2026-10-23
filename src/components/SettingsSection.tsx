@@ -47,6 +47,7 @@ import {
   ChevronDown,
   ChevronsUpDown,
   Smartphone,
+  Bell,
 } from 'lucide-react';
 import {
   UserPreferences,
@@ -63,19 +64,31 @@ import {
   GEMINI_MODEL_PRESETS,
   OPENROUTER_MODEL_PRESETS,
   isLocalEndpoint,
+  BujoEntry,
+  Habit,
+  EntryReminder,
 } from '../types';
-import { storage, DEFAULT_JOURNAL_CATEGORIES } from '../utils/storage';
+import { storage, DEFAULT_JOURNAL_CATEGORIES, getTodayDateString } from '../utils/storage';
 import { soundEngine } from '../utils/audioSynth';
 import { LerniMascot } from './Mascot/LerniMascot';
-import { useI18n, getCategoryLabel, translations, TranslationKey } from '../utils/i18n';
+import { useI18n, getCategoryLabel, translations, TranslationKey, toPersianDigits } from '../utils/i18n';
 import { testAiConnection, testAiPrompt } from '../utils/aiScheduler';
 import { usePwaInstall } from '../utils/usePwaInstall';
+import {
+  getNotificationPermission,
+  requestNotificationPermission,
+  sendTestReminderNotification,
+  getUpcomingRemindersForDate,
+  formatReminderOffset,
+} from '../utils/reminderManager';
 
 interface SettingsSectionProps {
   prefs: UserPreferences;
   onUpdatePrefs: (updated: Partial<UserPreferences>) => void;
   onReloadAllData: () => void;
   onBack: () => void;
+  bujoEntries?: BujoEntry[];
+  habits?: Habit[];
 }
 
 const SECTION_ICONS: Record<NavSection, React.ReactNode> = {
@@ -91,6 +104,8 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   onUpdatePrefs,
   onReloadAllData,
   onBack,
+  bujoEntries = [],
+  habits = [],
 }) => {
   const { language, setLanguage, t, isRtl } = useI18n();
 
@@ -223,6 +238,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     focus: false,
     categories: false,
     audio: false,
+    reminders: false,
     backup: false,
   });
 
@@ -245,18 +261,66 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
       focus: nextState,
       categories: nextState,
       audio: nextState,
+      reminders: nextState,
       backup: nextState,
     });
   };
 
-  // Smart Planner Custom Instructions state
-  const [plannerInstructionsInput, setPlannerInstructionsInput] = useState(prefs.plannerCustomInstructions || '');
-  const [instructionsSavedMessage, setInstructionsSavedMessage] = useState<string | null>(null);
+  // Notification and Reminders Settings state
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>(() =>
+    getNotificationPermission()
+  );
+  const [testNotifMessage, setTestNotifMessage] = useState<string | null>(null);
+  const [isTestingNotif, setIsTestingNotif] = useState(false);
+
+  const handleRequestNotificationPermission = async () => {
+    soundEngine.playPop();
+    const perm = await requestNotificationPermission();
+    setNotifPermission(perm);
+    if (perm === 'granted') {
+      soundEngine.playGentleChime();
+      setDraftPrefs((prev) => ({ ...prev, reminderNotificationsEnabled: true }));
+    }
+  };
+
+  const handleTestNotification = async () => {
+    setIsTestingNotif(true);
+    try {
+      await sendTestReminderNotification(selectedLanguage);
+      setTestNotifMessage(
+        isDraftFa
+          ? 'اعلان آزمایشی و زنگ یادآور با موفقیت فعال شد!'
+          : 'Test reminder notification & audio chime triggered!'
+      );
+      setTimeout(() => setTestNotifMessage(null), 4000);
+    } catch {
+      setTestNotifMessage(
+        isDraftFa ? 'خطا در ارسال اعلان آزمایشی.' : 'Failed to trigger test reminder.'
+      );
+      setTimeout(() => setTestNotifMessage(null), 4000);
+    } finally {
+      setIsTestingNotif(false);
+    }
+  };
 
   // Active language in current session and draft preview
   const selectedLanguage: Language = draftPrefs.language || language || 'en';
   const isDraftFa = selectedLanguage === 'fa';
   const isFa = language === 'fa';
+
+  // Scheduled reminders for today (chronologically sorted)
+  const upcomingTodayReminders = React.useMemo(() => {
+    return getUpcomingRemindersForDate(
+      bujoEntries,
+      habits,
+      getTodayDateString(),
+      isDraftFa ? 'fa' : 'en'
+    );
+  }, [bujoEntries, habits, isDraftFa]);
+
+  // Smart Planner Custom Instructions state
+  const [plannerInstructionsInput, setPlannerInstructionsInput] = useState(prefs.plannerCustomInstructions || '');
+  const [instructionsSavedMessage, setInstructionsSavedMessage] = useState<string | null>(null);
 
   // Update language in draft preferences only; does not apply until user clicks Save
   const handleLanguageChange = (newLang: Language) => {
@@ -618,6 +682,8 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     draftPrefs.theme !== prefs.theme ||
     (draftPrefs.soundEffectsEnabled ?? true) !== (prefs.soundEffectsEnabled ?? true) ||
     (draftPrefs.soundAlerts ?? true) !== (prefs.soundAlerts ?? true) ||
+    (draftPrefs.reminderNotificationsEnabled ?? true) !== (prefs.reminderNotificationsEnabled ?? true) ||
+    (draftPrefs.reminderSoundEnabled ?? true) !== (prefs.reminderSoundEnabled ?? true) ||
     selectedProvider !== (prefs.aiProvider || 'gemini') ||
     apiKeyInput.trim() !== (prefs.geminiApiKey || '') ||
     (geminiModelInput.trim() || DEFAULT_GEMINI_MODEL) !== (prefs.geminiModel || DEFAULT_GEMINI_MODEL) ||
@@ -650,6 +716,8 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
       navOrder: currentNavOrder,
       focusTabOrder: currentFocusTabOrder,
       journalCategories: currentCategories,
+      reminderNotificationsEnabled: draftPrefs.reminderNotificationsEnabled ?? true,
+      reminderSoundEnabled: draftPrefs.reminderSoundEnabled ?? true,
       aiProvider: selectedProvider,
       geminiApiKey: cleanApiKey,
       geminiModel: cleanGeminiModel,
@@ -2686,6 +2754,245 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                         />
                         <div className="w-9 h-5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] rtl:after:left-auto rtl:after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#80D141]"></div>
                       </label>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </section>
+
+          {/* Feature: Reminders & Notifications (Expandable) */}
+          <section id="section-settings-reminders" className="rounded-[28px] bg-white dark:bg-[#182316] border border-[#D8E8D0] dark:border-[#22301F] shadow-sm transition-all duration-200 overflow-hidden">
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => toggleSection('reminders')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  toggleSection('reminders');
+                }
+              }}
+              aria-expanded={expandedSections['reminders']}
+              className="w-full p-4 sm:p-5 flex items-center justify-between text-start gap-3 hover:bg-[#F9FAF6] dark:hover:bg-[#1C2819] transition-colors cursor-pointer group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/50 flex items-center justify-center text-[#234A00] dark:text-[#80D141] shrink-0 group-hover:scale-105 transition-transform">
+                  <Bell className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                      {t('settings.remindersSection', 'Reminders & Notifications')}
+                    </h3>
+                    {notifPermission === 'granted' && (
+                      <span className="text-[11px] font-semibold text-[#1C3700] dark:text-[#80D141] px-2 py-0.5 rounded-full bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/30">
+                        {isDraftFa ? 'مجاز' : 'Granted'}
+                      </span>
+                    )}
+                    {notifPermission === 'denied' && (
+                      <span className="text-[11px] font-semibold text-red-700 dark:text-red-300 px-2 py-0.5 rounded-full bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/40">
+                        {isDraftFa ? 'مسدود' : 'Blocked'}
+                      </span>
+                    )}
+                    {(notifPermission === 'default' || notifPermission === 'unsupported') && (
+                      <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/40">
+                        {isDraftFa ? 'نیاز به دسترسی' : 'Setup Needed'}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[#485B44] dark:text-[#9EB598] truncate">
+                    {t('settings.remindersDesc', 'Configure alarms, sound alerts, and scheduled reminder times')}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleTestNotification();
+                  }}
+                  disabled={isTestingNotif}
+                  className="px-2.5 py-1 rounded-full bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] text-[11px] font-bold text-[#3B4E37] dark:text-[#B6CCB0] border border-[#D8E8D0] dark:border-[#273722] flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Trigger sample notification"
+                >
+                  <Bell className="w-3.5 h-3.5" />
+                  <span>{isTestingNotif ? (isDraftFa ? '...' : '...') : t('common.test', 'Test')}</span>
+                </button>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-[#485B44] dark:text-[#9EB598] group-hover:text-[#151E14] dark:group-hover:text-[#E8F2E4] group-hover:bg-[#EDF6E8] dark:group-hover:bg-[#202E1E] transition-colors">
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${expandedSections['reminders'] ? 'rotate-180' : ''}`} />
+                </div>
+              </div>
+            </div>
+
+            <AnimatePresence initial={false}>
+              {expandedSections['reminders'] && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22, ease: 'easeInOut' }}
+                >
+                  <div className="px-5 pb-5 sm:px-6 sm:pb-6 pt-2 border-t border-[#DCEAD4]/80 dark:border-[#263722] space-y-4">
+                    {/* System Permission Card */}
+                    <div className="p-3.5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] space-y-2.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="text-xs">
+                          <div className="font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                            {t('settings.systemNotifications', 'Desktop & Mobile System Notifications')}
+                          </div>
+                          <div className="text-[#485B44] dark:text-[#9EB598] text-[11px] mt-0.5 leading-relaxed">
+                            {notifPermission === 'granted'
+                              ? t('settings.notificationsGranted', 'Notifications are active and will appear when reminders are due.')
+                              : notifPermission === 'denied'
+                              ? t('settings.notificationsBlocked', 'Notifications are blocked in your browser settings. Please allow notifications for this site.')
+                              : t('settings.notificationsPrompt', 'Allow notifications to receive reminder alerts even when the tab is backgrounded.')}
+                          </div>
+                        </div>
+
+                        {notifPermission !== 'granted' && notifPermission !== 'unsupported' && (
+                          <button
+                            type="button"
+                            onClick={handleRequestNotificationPermission}
+                            className="px-3 py-1.5 rounded-xl bg-[#80D141] hover:bg-[#72BF36] text-[#0F2600] text-xs font-bold shadow-xs flex items-center gap-1.5 transition-transform active:scale-95 shrink-0 cursor-pointer"
+                          >
+                            <Bell className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>{t('settings.enableNotifications', 'Enable Alerts')}</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {testNotifMessage && (
+                        <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-800 text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                          <span>{testNotifMessage}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Master System Push Toggle */}
+                    <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26]">
+                      <div className="text-xs">
+                        <div className="font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                          {t('settings.reminderPushAlerts', 'System Push Notifications')}
+                        </div>
+                        <div className="text-[#485B44] dark:text-[#9EB598] text-[11px]">
+                          {t('settings.reminderPushSub', 'Show banner notifications at reminder times')}
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={draftPrefs.reminderNotificationsEnabled ?? true}
+                          onChange={(e) => {
+                            const isEnabled = e.target.checked;
+                            setDraftPrefs((prev) => ({ ...prev, reminderNotificationsEnabled: isEnabled }));
+                            if (isEnabled && notifPermission !== 'granted') {
+                              handleRequestNotificationPermission();
+                            }
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] rtl:after:left-auto rtl:after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#80D141]"></div>
+                      </label>
+                    </div>
+
+                    {/* Reminder Sound Chimes Toggle */}
+                    <div className={`flex items-center justify-between p-3.5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] transition-opacity ${
+                      !(draftPrefs.soundEffectsEnabled ?? true) ? 'opacity-50 pointer-events-none' : ''
+                    }`}>
+                      <div className="text-xs">
+                        <div className="font-bold text-[#151E14] dark:text-[#E8F2E4]">
+                          {t('settings.reminderChimes', 'Reminder Sound Chimes')}
+                        </div>
+                        <div className="text-[#485B44] dark:text-[#9EB598] text-[11px]">
+                          {t('settings.reminderChimesSub', 'Play a harmonic chime when a reminder is triggered')}
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          disabled={!(draftPrefs.soundEffectsEnabled ?? true)}
+                          checked={(draftPrefs.reminderSoundEnabled ?? true) && (draftPrefs.soundEffectsEnabled ?? true)}
+                          onChange={(e) => {
+                            const isEnabled = e.target.checked;
+                            setDraftPrefs((prev) => ({ ...prev, reminderSoundEnabled: isEnabled }));
+                            if (isEnabled) {
+                              soundEngine.playGentleChime();
+                            }
+                          }}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] rtl:after:left-auto rtl:after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#80D141]"></div>
+                      </label>
+                    </div>
+
+                    {/* Today's Scheduled Reminders Summary */}
+                    <div className="space-y-2 pt-1">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-[#80D141]" />
+                          <span>{t('settings.scheduledToday', "Today's Scheduled Reminders")}</span>
+                        </h4>
+                        <span className="text-[11px] font-semibold text-[#485B44] dark:text-[#9EB598]">
+                          {isDraftFa
+                            ? `${toPersianDigits(upcomingTodayReminders.length)} مورد`
+                            : `${upcomingTodayReminders.length} items`}
+                        </span>
+                      </div>
+
+                      {upcomingTodayReminders.length > 0 ? (
+                        <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                          {upcomingTodayReminders.map((item) => (
+                            <div
+                              key={item.id}
+                              className={`p-3 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] flex items-center justify-between gap-3 text-xs ${
+                                item.isPast ? 'opacity-60' : ''
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span className="font-bold font-mono text-[11px] px-2 py-0.5 rounded-lg bg-white dark:bg-[#263722] border border-[#DCEAD4] dark:border-[#33482E] text-[#151E14] dark:text-[#E8F2E4] shrink-0">
+                                  {isDraftFa ? toPersianDigits(item.reminderTime) : item.reminderTime}
+                                </span>
+                                <div className="min-w-0">
+                                  <div className="font-bold text-[#151E14] dark:text-[#E8F2E4] truncate">
+                                    {item.title}
+                                  </div>
+                                  <div className="text-[10px] text-[#485B44] dark:text-[#9EB598] flex items-center gap-1.5">
+                                    <span className="capitalize">
+                                      {item.entryType === 'event'
+                                        ? (isDraftFa ? 'رویداد' : 'Event')
+                                        : item.entryType === 'habit'
+                                        ? (isDraftFa ? 'عادت' : 'Habit')
+                                        : (isDraftFa ? 'وظیفه' : 'Task')}
+                                    </span>
+                                    <span>•</span>
+                                    <span>{item.label}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                                item.isPast
+                                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-500'
+                                  : 'bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1C3700] dark:text-[#80D141] border border-[#80D141]/30'
+                              }`}>
+                                {item.isPast
+                                  ? (isDraftFa ? 'گذشته' : 'Past')
+                                  : (isDraftFa ? 'پیش‌رو' : 'Upcoming')}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="p-4 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-dashed border-[#DCEAD4] dark:border-[#2A3E26] text-center">
+                          <p className="text-xs text-[#485B44] dark:text-[#9EB598]">
+                            {t('settings.noRemindersToday', 'No reminders scheduled for today yet. Add reminders to your tasks or habits.')}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </motion.div>
