@@ -753,29 +753,41 @@ export const BulletJournal: React.FC<BulletJournalProps> = ({
                 )}
 
                 {/* Reminder Badge */}
-                {entry.reminders && entry.reminders.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      soundEngine.playPop();
-                      setReminderTargetEntry(entry);
-                    }}
-                    className={`px-2 py-0.5 rounded-full text-[11px] font-bold inline-flex items-center gap-1 shrink-0 cursor-pointer hover:scale-105 transition-transform ${
-                      isCompleted
-                        ? 'bg-[#CCEBB6] dark:bg-[#254A20] text-[#14300B] dark:text-[#CFF3B8]'
-                        : 'bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1C3700] dark:text-[#80D141] border border-[#80D141]/40 shadow-2xs'
-                    }`}
-                    title={language === 'fa' ? 'مدیریت یادآورها' : 'Manage reminders'}
-                  >
-                    <Bell className="w-3 h-3 fill-current" />
-                    <span>
-                      {language === 'fa'
-                        ? `${toPersianDigits(entry.reminders.length)} یادآور`
-                        : `${entry.reminders.length} reminder${entry.reminders.length > 1 ? 's' : ''}`}
-                    </span>
-                  </button>
-                )}
+                {entry.reminders && entry.reminders.length > 0 && (() => {
+                  const hasStrong = entry.reminders.some((r) => r.intensity === 'strong');
+                  return (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        soundEngine.playPop();
+                        setReminderTargetEntry(entry);
+                      }}
+                      className={`px-2 py-0.5 rounded-full text-[11px] font-bold inline-flex items-center gap-1 shrink-0 cursor-pointer hover:scale-105 transition-transform ${
+                        isCompleted
+                          ? 'bg-[#CCEBB6] dark:bg-[#254A20] text-[#14300B] dark:text-[#CFF3B8]'
+                          : hasStrong
+                          ? 'bg-rose-100 dark:bg-rose-950/70 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 shadow-2xs ring-1 ring-rose-400/40'
+                          : 'bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1C3700] dark:text-[#80D141] border border-[#80D141]/40 shadow-2xs'
+                      }`}
+                      title={language === 'fa' ? 'مدیریت یادآورها' : 'Manage reminders'}
+                    >
+                      {hasStrong ? (
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                        </span>
+                      ) : (
+                        <Bell className="w-3 h-3 fill-current" />
+                      )}
+                      <span>
+                        {language === 'fa'
+                          ? `${toPersianDigits(entry.reminders.length)} یادآور${hasStrong ? ' (شدید)' : ''}`
+                          : `${entry.reminders.length} reminder${entry.reminders.length > 1 ? 's' : ''}${hasStrong ? ' (Strong)' : ''}`}
+                      </span>
+                    </button>
+                  );
+                })()}
 
                 {isMigrated && (
                   <span className="text-amber-600 dark:text-amber-400 font-bold">

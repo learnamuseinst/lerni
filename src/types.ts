@@ -11,6 +11,8 @@ export const ENERGY_LEVELS: { id: EnergyLevel; label: string; icon: string; name
 
 export type TimeBucket = 'morning' | 'midday' | 'evening' | 'anytime';
 
+export type ReminderIntensity = 'normal' | 'strong';
+
 export interface EntryReminder {
   id: string;
   // Offset in minutes before the target time (0 = at the time, 5 = 5m before, 15 = 15m before, etc.)
@@ -18,7 +20,10 @@ export interface EntryReminder {
   customTime?: string; // Optional HH:mm if specific time of day is chosen
   label?: string; // Optional custom title/label
   enabled?: boolean; // Defaults to true
+  intensity?: ReminderIntensity; // 'normal' (single alert) | 'strong' (repeats every 3s until dismissed/snoozed)
 }
+
+export type Reminder = EntryReminder;
 
 export interface Habit {
   id: string;
@@ -81,7 +86,7 @@ export interface BujoEntry {
   reminders?: EntryReminder[];
 }
 
-export type FocusTimerMode = 'sprint_5' | 'burst_15' | 'pomodoro_25' | 'deep_45' | 'flowmodoro' | 'custom';
+export type FocusTimerMode = 'sprint_5' | 'burst_15' | 'pomodoro_25' | 'deep_45' | 'flowmodoro' | 'custom' | (string & {});
 
 export type AmbientSoundType = 'off' | 'brown' | 'pink' | 'binaural_40hz' | 'rain_hum';
 
@@ -327,8 +332,27 @@ export interface UserPreferences {
   useSharedFreeKey?: boolean; // Whether the user uses the shared community free API key
   plannerCustomInstructions?: string; // Persistent custom instructions for smart planner
   reminderNotificationsEnabled?: boolean; // Whether browser notifications are active
+  notificationsEnabled?: boolean; // Legacy alias for reminderNotificationsEnabled
   reminderSoundEnabled?: boolean; // Whether reminder chime is enabled
+  customFocusPresets?: FocusTimerPreset[]; // User custom focus timer presets
 }
+
+export interface FocusTimerPreset {
+  id: string;
+  label: string;
+  minutes: number;
+  icon: string;
+  desc?: string;
+}
+
+export const DEFAULT_FOCUS_PRESETS: FocusTimerPreset[] = [
+  { id: 'sprint_5', label: 'Dopamine Sprint', minutes: 5, icon: '⚡', desc: '5 min burst' },
+  { id: 'burst_15', label: 'Focus Burst', minutes: 15, icon: '🎯', desc: '15 min micro-task' },
+  { id: 'pomodoro_25', label: 'Pomodoro', minutes: 25, icon: '🍅', desc: '25 min focus' },
+  { id: 'deep_45', label: 'Deep Immersion', minutes: 45, icon: '🌊', desc: '45 min sustained flow' },
+  { id: 'flowmodoro', label: 'Flowmodoro', minutes: 0, icon: '🚀', desc: 'Open hyperfocus count-up' },
+  { id: 'custom', label: 'Custom', minutes: 20, icon: '⏱️', desc: 'Set custom duration' },
+];
 
 export function isLocalEndpoint(url?: string): boolean {
   if (!url) return false;

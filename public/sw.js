@@ -124,19 +124,334 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Notification Click Event: Focus or Open Application
+// Notification Click Event: Handle Dismiss, Snooze 5m, or Open Application
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const action = event.action;
+  const data = event.notification.data || {};
+  const alertId = data.id || event.notification.tag?.replace('lerni-rem-', '');
+
+  // Stop 3-second repeating loop if this was a Strong reminder
+  if (alertId) {
+    stopStrongAlarmInSW(alertId);
+  }
+
+  if (action === 'dismiss') {
+    event.waitUntil(
+      (async () => {
+        await markReminderDismissedInDb(alertId);
+        const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        for (const client of clients) {
+          client.postMessage({ type: 'REMINDER_DISMISSED', alertId, data });
+        }
+      })()
+    );
+    return;
+  }
+
+  if (action === 'snooze') {
+    event.waitUntil(
+      (async () => {
+        await scheduleSnoozeInDb(data, 5);
+        const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        for (const client of clients) {
+          client.postMessage({ type: 'REMINDER_SNOOZED', alertId, minutes: 5, data });
+        }
+      })()
+    );
+    return;
+  }
+
+  // User clicked notification body or 'open' action -> focus or open app
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+    (async () => {
+      const clientList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       for (const client of clientList) {
         if ('focus' in client) {
-          return client.focus();
+          await client.focus();
+          client.postMessage({ type: 'REMINDER_OPENED_FROM_NOTIFICATION', data });
+          return;
         }
       }
       if (self.clients.openWindow) {
-        return self.clients.openWindow('/');
+        const newClient = await self.clients.openWindow('/');
+        if (newClient) {
+          setTimeout(() => {
+            newClient.postMessage({ type: 'REMINDER_OPENED_FROM_NOTIFICATION', data });
+          }, 1000);
+        }
       }
-    })
+    })()
   );
 });
+
+// -------------------------------------------------------------
+// Offline Background Reminder Engine & Strong 3-Second Alarms
+// -------------------------------------------------------------
+const DB_NAME = 'lerni_reminders_db';
+const DB_VERSION = 1;
+const STORE_NAME = 'scheduled_reminders';
+const activeStrongAlarms = new Map(); // alertId -> { intervalId, count }
+let nextAlarmTimeoutId = null;
+
+function openRemindersDB() {
+  return new Promise((resolve, reject) => {
+    if (!('indexedDB' in self)) {
+      resolve(null);
+      return;
+    }
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => resolve(null);
+  });
+}
+
+async function getStoredReminders() {
+  const db = await openRemindersDB();
+  if (!db) return [];
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => resolve([]);
+    } catch {
+      resolve([]);
+    }
+  });
+}
+
+async function saveStoredReminders(reminders) {
+  const db = await openRemindersDB();
+  if (!db) return;
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.clear();
+      for (const r of reminders) {
+        store.put(r);
+      }
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+}
+
+async function markReminderDismissedInDb(alertId) {
+  const db = await openRemindersDB();
+  if (!db || !alertId) return;
+  try {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.delete(alertId);
+  } catch {}
+}
+
+async function scheduleSnoozeInDb(data, minutes = 5) {
+  const db = await openRemindersDB();
+  if (!db || !data) return;
+  try {
+    const triggerMs = Date.now() + minutes * 60 * 1000;
+    const snoozedItem = {
+      ...data,
+      id: `snooze-${data.id || Date.now()}`,
+      triggerTimeMs: triggerMs,
+      label: data.isFa ? `به‌تعویق افتاده (${minutes} د)` : `Snoozed (${minutes}m)`,
+      isSnoozed: true,
+    };
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.put(snoozedItem);
+    scheduleNextAlarmInSW();
+  } catch {}
+}
+
+function stopStrongAlarmInSW(alertId) {
+  if (activeStrongAlarms.has(alertId)) {
+    const record = activeStrongAlarms.get(alertId);
+    if (record && record.intervalId) {
+      clearInterval(record.intervalId);
+    }
+    activeStrongAlarms.delete(alertId);
+  }
+}
+
+function stopAllStrongAlarmsInSW() {
+  for (const [id, record] of activeStrongAlarms.entries()) {
+    if (record && record.intervalId) {
+      clearInterval(record.intervalId);
+    }
+  }
+  activeStrongAlarms.clear();
+}
+
+// Dispatches system notification and sets up 3-second repetition for Strong reminders
+async function dispatchServiceWorkerNotification(item) {
+  const isFa = Boolean(item.isFa);
+  const isStrong = item.intensity === 'strong';
+  const tag = `lerni-rem-${item.id}`;
+
+  const titlePrefix = isStrong ? '🚨 [STRONG / شدید] ' : '🔔 ';
+  const title = `${titlePrefix}${item.entryType === 'event' ? (isFa ? 'رویداد' : 'Event') : item.entryType === 'habit' ? (isFa ? 'عادت' : 'Habit') : (isFa ? 'وظیفه' : 'Task')}: ${item.title}`;
+  const body = `${item.label || ''}${item.time ? ` · ${item.time}` : ''}${isStrong ? (isFa ? ' — تکرار مداوم هر ۳ ثانیه تا زمان باز شدن برنامه' : ' — Repeating every 3s until app is opened') : ''}`;
+
+  const notificationOptions = {
+    body,
+    icon: '/icon.svg',
+    badge: '/icon.svg',
+    tag,
+    renotify: true,
+    requireInteraction: isStrong,
+    vibrate: isStrong ? [400, 150, 400, 150, 400] : [250, 100, 250],
+    data: {
+      ...item,
+      url: '/',
+    },
+    actions: [
+      { action: 'dismiss', title: isFa ? 'رد کردن' : 'Dismiss' },
+      { action: 'snooze', title: isFa ? 'تعویق ۵ د' : 'Snooze 5m' },
+    ],
+  };
+
+  try {
+    // Show first notification immediately
+    await self.registration.showNotification(title, notificationOptions);
+
+    // If Strong reminder, start repeating every 3 seconds!
+    if (isStrong) {
+      stopStrongAlarmInSW(item.id);
+      let repeatCount = 0;
+      const intervalId = setInterval(async () => {
+        repeatCount++;
+        // Safety cap: max 300 cycles (15 minutes) of 3-second repeating notifications
+        if (repeatCount > 300 || !activeStrongAlarms.has(item.id)) {
+          clearInterval(intervalId);
+          activeStrongAlarms.delete(item.id);
+          return;
+        }
+
+        try {
+          await self.registration.showNotification(title, {
+            ...notificationOptions,
+            tag,
+            renotify: true,
+          });
+        } catch (err) {
+          console.warn('Repeating strong notification failed:', err);
+        }
+      }, 3000);
+
+      activeStrongAlarms.set(item.id, { intervalId, item, repeatCount });
+    }
+  } catch (err) {
+    console.warn('Service worker notification dispatch failed:', err);
+  }
+}
+
+// Background scheduler for closed app
+async function checkDueRemindersInSW() {
+  const reminders = await getStoredReminders();
+  if (!reminders || reminders.length === 0) return;
+
+  const nowMs = Date.now();
+  const remaining = [];
+
+  for (const item of reminders) {
+    const diff = nowMs - item.triggerTimeMs;
+
+    // Trigger if due (within window from 0 to 120 seconds after triggerTimeMs)
+    if (diff >= 0 && diff <= 120000 && !item.fired) {
+      item.fired = true;
+      dispatchServiceWorkerNotification(item);
+    }
+
+    // Keep items that haven't passed or were snoozed
+    if (item.triggerTimeMs > nowMs - 60000) {
+      remaining.push(item);
+    }
+  }
+
+  await saveStoredReminders(remaining);
+  scheduleNextAlarmInSW();
+}
+
+async function scheduleNextAlarmInSW() {
+  if (nextAlarmTimeoutId) {
+    clearTimeout(nextAlarmTimeoutId);
+    nextAlarmTimeoutId = null;
+  }
+
+  const reminders = await getStoredReminders();
+  if (!reminders || reminders.length === 0) return;
+
+  const nowMs = Date.now();
+  const futureReminders = reminders.filter((r) => r.triggerTimeMs > nowMs);
+  if (futureReminders.length === 0) return;
+
+  futureReminders.sort((a, b) => a.triggerTimeMs - b.triggerTimeMs);
+  const nextEarliest = futureReminders[0];
+  const delayMs = Math.max(1000, nextEarliest.triggerTimeMs - nowMs);
+
+  // If modern Notification Triggers API (Chromium showTrigger) is supported, register it natively!
+  try {
+    if ('showTrigger' in Notification.prototype && typeof TimestampTrigger !== 'undefined') {
+      const isFa = Boolean(nextEarliest.isFa);
+      const isStrong = nextEarliest.intensity === 'strong';
+      const titlePrefix = isStrong ? '🚨 [STRONG / شدید] ' : '🔔 ';
+      const title = `${titlePrefix}${nextEarliest.title}`;
+      self.registration.showNotification(title, {
+        body: nextEarliest.label || '',
+        icon: '/icon.svg',
+        tag: `lerni-rem-${nextEarliest.id}`,
+        showTrigger: new TimestampTrigger(nextEarliest.triggerTimeMs),
+        data: nextEarliest,
+      });
+    }
+  } catch (e) {
+    // TimestampTrigger not supported in this browser version; fallback to setTimeout
+  }
+
+  // SW setTimeout alarm scheduler
+  // Browsers allow setTimeout in SW; capping at 24 hours
+  if (delayMs <= 86400000) {
+    nextAlarmTimeoutId = setTimeout(() => {
+      checkDueRemindersInSW();
+    }, delayMs);
+  }
+}
+
+// Service Worker Message Listener
+self.addEventListener('message', (event) => {
+  if (!event.data || !event.data.type) return;
+
+  const { type, reminders, id } = event.data;
+
+  if (type === 'SYNC_SCHEDULED_REMINDERS' && Array.isArray(reminders)) {
+    event.waitUntil(
+      (async () => {
+        await saveStoredReminders(reminders);
+        await scheduleNextAlarmInSW();
+      })()
+    );
+  } else if (type === 'STOP_STRONG_REMINDER') {
+    if (id) {
+      stopStrongAlarmInSW(id);
+    }
+  } else if (type === 'CLIENT_ENTERED_APP') {
+    // When the user opens/enters the app, stop SW 3s notifications so in-app banner handles it
+    stopAllStrongAlarmsInSW();
+  } else if (type === 'CHECK_REMINDERS_NOW') {
+    event.waitUntil(checkDueRemindersInSW());
+  }
+});
+

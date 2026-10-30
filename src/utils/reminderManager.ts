@@ -1,4 +1,4 @@
-import { BujoEntry, Habit, EntryReminder, UserPreferences, Language, isHabitActiveOnDate } from '../types';
+import { BujoEntry, Habit, EntryReminder, UserPreferences, Language, isHabitActiveOnDate, ReminderIntensity } from '../types';
 import { getTodayDateString } from './storage';
 import { soundEngine } from './audioSynth';
 import { toPersianDigits } from './i18n';
@@ -14,6 +14,7 @@ export interface ActiveReminderAlert {
   reminderLabel: string;
   offsetMinutes: number;
   triggeredAt: number;
+  intensity?: ReminderIntensity;
 }
 
 export interface UpcomingReminderItem {
@@ -28,6 +29,7 @@ export interface UpcomingReminderItem {
   offsetMinutes: number;
   label: string;
   isPast: boolean;
+  intensity?: ReminderIntensity;
 }
 
 export const REMINDER_PRESETS: { offsetMinutes: number; labelEn: string; labelFa: string }[] = [
@@ -94,11 +96,20 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
 }
 
 /**
- * Dispatches a native browser system notification
+ * Dispatches a native browser system notification with intensity awareness
  */
-export async function dispatchBrowserNotification(title: string, body: string, tag?: string): Promise<boolean> {
+export async function dispatchBrowserNotification(
+  title: string,
+  body: string,
+  tag?: string,
+  intensity: ReminderIntensity = 'normal',
+  dataPayload?: any
+): Promise<boolean> {
   if (!isNotificationSupported()) return false;
   if (Notification.permission !== 'granted') return false;
+
+  const isStrong = intensity === 'strong';
+  const notificationTag = tag || `lerni-${Date.now()}`;
 
   try {
     if ('serviceWorker' in navigator) {
@@ -108,8 +119,15 @@ export async function dispatchBrowserNotification(title: string, body: string, t
           body,
           icon: '/icon.svg',
           badge: '/icon.svg',
-          tag: tag || `lerni-${Date.now()}`,
-          data: { url: '/' },
+          tag: notificationTag,
+          renotify: true,
+          requireInteraction: isStrong,
+          vibrate: isStrong ? [400, 150, 400, 150, 400] : [250, 100, 250],
+          data: { url: '/', intensity, ...dataPayload },
+          actions: [
+            { action: 'dismiss', title: 'Dismiss' },
+            { action: 'snooze', title: 'Snooze 5m' },
+          ],
         } as any);
         return true;
       }
@@ -118,8 +136,10 @@ export async function dispatchBrowserNotification(title: string, body: string, t
     new Notification(title, {
       body,
       icon: '/icon.svg',
-      tag: tag || `lerni-${Date.now()}`,
-    });
+      tag: notificationTag,
+      renotify: true,
+      requireInteraction: isStrong,
+    } as any);
     return true;
   } catch (e) {
     console.warn('Could not dispatch browser notification:', e);
@@ -130,15 +150,203 @@ export async function dispatchBrowserNotification(title: string, body: string, t
 /**
  * Send a sample/test notification to verify system sounds and display
  */
-export async function sendTestReminderNotification(lang: Language = 'en'): Promise<boolean> {
+export async function sendTestReminderNotification(
+  lang: Language = 'en',
+  intensity: ReminderIntensity = 'normal'
+): Promise<boolean> {
   const isFa = lang === 'fa';
-  const title = isFa ? '🔔 لرنی — یادآور آزمایشی' : '🔔 Lerni — Test Reminder';
+  const isStrong = intensity === 'strong';
+
+  if (isStrong) {
+    soundEngine.playStrongAlarmPulse();
+    const title = isFa ? '🚨 لرنی — یادآور آزمایشی شدید (Strong)' : '🚨 Lerni — Test Strong Reminder';
+    const body = isFa
+      ? 'یادآور شدید لرنی: تکرار اعلان هر ۳ ثانیه تا زمان باز شدن برنامه و رد یا تعویق!'
+      : 'Lerni Strong Reminder: Repeated alert every 3s until opened and dismissed/snoozed!';
+    return dispatchBrowserNotification(title, body, 'lerni-test-strong', 'strong', { isTest: true });
+  }
+
+  soundEngine.playGentleChime();
+  const title = isFa ? '🔔 لرنی — یادآور آزمایشی معمولی' : '🔔 Lerni — Test Normal Reminder';
   const body = isFa
     ? 'سیستم یادآورها و اعلان‌های لرنی به درستی فعال است!'
     : 'Lerni reminders & notifications are active and ready!';
+  return dispatchBrowserNotification(title, body, 'lerni-test-normal', 'normal', { isTest: true });
+}
 
-  soundEngine.playGentleChime();
-  return dispatchBrowserNotification(title, body, 'lerni-test-reminder');
+// -------------------------------------------------------------
+// Closed-App & Offline IndexedDB Synchronization
+// -------------------------------------------------------------
+const DB_NAME = 'lerni_reminders_db';
+const DB_VERSION = 1;
+const STORE_NAME = 'scheduled_reminders';
+
+function openRemindersDB(): Promise<IDBDatabase | null> {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || !('indexedDB' in window)) {
+      resolve(null);
+      return;
+    }
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e: any) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => resolve(null);
+  });
+}
+
+/**
+ * Synchronizes all upcoming reminders to IndexedDB and the Service Worker
+ * so alarms trigger accurately even when the application tab is closed.
+ */
+export async function syncRemindersWithServiceWorker(
+  bujoEntries: BujoEntry[],
+  habits: Habit[],
+  prefs: UserPreferences
+): Promise<void> {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const scheduledItems: any[] = [];
+    const now = new Date();
+    const nowMs = now.getTime();
+    const lang = prefs.language || 'en';
+    const isFa = lang === 'fa';
+
+    // Build next 7 days date strings
+    const dateStrings: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      dateStrings.push(`${y}-${m}-${day}`);
+    }
+
+    for (const dateStr of dateStrings) {
+      // 1. Tasks & Events
+      for (const entry of bujoEntries) {
+        if (entry.date !== dateStr) continue;
+        if (entry.status !== 'open') continue;
+        if (entry.type !== 'task' && entry.type !== 'event') continue;
+        if (!entry.reminders || entry.reminders.length === 0) continue;
+
+        for (const rem of entry.reminders) {
+          if (rem.enabled === false) continue;
+          const triggerDate = calculateReminderTriggerTime(entry.date, entry.time, rem, '09:00');
+          if (!triggerDate) continue;
+
+          const triggerMs = triggerDate.getTime();
+          if (triggerMs > nowMs - 60000) {
+            scheduledItems.push({
+              id: `bujo-${entry.id}-${rem.id}-${entry.date}`,
+              reminderId: rem.id,
+              entryId: entry.id,
+              entryType: entry.type,
+              title: entry.content,
+              time: entry.time,
+              label: formatReminderOffset(rem.offsetMinutes, lang),
+              triggerTimeMs: triggerMs,
+              intensity: rem.intensity || 'normal',
+              isFa,
+            });
+          }
+        }
+      }
+
+      // 2. Habits
+      for (const habit of habits) {
+        if (habit.isArchived) continue;
+        if (!habit.reminders || habit.reminders.length === 0) continue;
+        if (!isHabitActiveOnDate(habit, dateStr)) continue;
+
+        const defaultHabitTime =
+          habit.timeBucket === 'morning'
+            ? '08:00'
+            : habit.timeBucket === 'midday'
+            ? '12:30'
+            : habit.timeBucket === 'evening'
+            ? '20:30'
+            : '09:00';
+
+        for (const rem of habit.reminders) {
+          if (rem.enabled === false) continue;
+          const triggerDate = calculateReminderTriggerTime(dateStr, habit.time, rem, defaultHabitTime);
+          if (!triggerDate) continue;
+
+          const triggerMs = triggerDate.getTime();
+          if (triggerMs > nowMs - 60000) {
+            scheduledItems.push({
+              id: `habit-${habit.id}-${rem.id}-${dateStr}`,
+              reminderId: rem.id,
+              entryId: habit.id,
+              entryType: 'habit',
+              title: habit.title,
+              time: habit.time || defaultHabitTime,
+              label: formatReminderOffset(rem.offsetMinutes, lang),
+              triggerTimeMs: triggerMs,
+              intensity: rem.intensity || 'normal',
+              isFa,
+            });
+          }
+        }
+      }
+    }
+
+    // Write to IndexedDB for persistent background access by Service Worker
+    const db = await openRemindersDB();
+    if (db) {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.clear();
+      for (const item of scheduledItems) {
+        store.put(item);
+      }
+    }
+
+    // Post to Service Worker
+    if ('serviceWorker' in navigator) {
+      const controller = navigator.serviceWorker.controller;
+      if (controller) {
+        controller.postMessage({
+          type: 'SYNC_SCHEDULED_REMINDERS',
+          reminders: scheduledItems,
+        });
+      } else {
+        navigator.serviceWorker.ready.then((reg) => {
+          reg.active?.postMessage({
+            type: 'SYNC_SCHEDULED_REMINDERS',
+            reminders: scheduledItems,
+          });
+        }).catch(() => {});
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to sync reminders to service worker:', e);
+  }
+}
+
+export function stopStrongReminderInSW(alertId: string): void {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+  try {
+    navigator.serviceWorker.controller?.postMessage({
+      type: 'STOP_STRONG_REMINDER',
+      id: alertId,
+    });
+  } catch {}
+}
+
+export function notifyServiceWorkerUserEntered(): void {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+  try {
+    navigator.serviceWorker.controller?.postMessage({
+      type: 'CLIENT_ENTERED_APP',
+    });
+  } catch {}
 }
 
 const FIRED_STORAGE_KEY = 'lerni_fired_reminders_v2';
@@ -264,6 +472,7 @@ export function checkAndTriggerDueReminders(
         const typeLabel = entry.type === 'event'
           ? (isFa ? 'رویداد' : 'Event')
           : (isFa ? 'وظیفه' : 'Task');
+        const intensity = reminder.intensity || 'normal';
 
         const alert: ActiveReminderAlert = {
           id: firedKey,
@@ -276,6 +485,7 @@ export function checkAndTriggerDueReminders(
           reminderLabel: timingLabel,
           offsetMinutes: reminder.offsetMinutes,
           triggeredAt: nowMs,
+          intensity,
         };
 
         // Notify in-app
@@ -283,14 +493,26 @@ export function checkAndTriggerDueReminders(
 
         // Sound alert
         if (prefs.reminderSoundEnabled !== false && prefs.soundEffectsEnabled !== false) {
-          soundEngine.playGentleChime();
+          if (intensity === 'strong') {
+            soundEngine.playStrongAlarmPulse();
+          } else {
+            soundEngine.playGentleChime();
+          }
         }
 
         // Native Browser Notification
         if (prefs.reminderNotificationsEnabled !== false) {
-          const notifTitle = `🔔 ${typeLabel}: ${entry.content}`;
-          const notifBody = `${timingLabel}${entry.time ? ` · ${entry.time}` : ''}`;
-          dispatchBrowserNotification(notifTitle, notifBody, firedKey);
+          const prefix = intensity === 'strong' ? '🚨 [STRONG / شدید] ' : '🔔 ';
+          const notifTitle = `${prefix}${typeLabel}: ${entry.content}`;
+          const notifBody = `${timingLabel}${entry.time ? ` · ${entry.time}` : ''}${
+            intensity === 'strong' ? (isFa ? ' — تکرار مداوم هر ۳ ثانیه' : ' — Repeating every 3s') : ''
+          }`;
+          dispatchBrowserNotification(notifTitle, notifBody, firedKey, intensity, {
+            id: firedKey,
+            reminderId: reminder.id,
+            entryId: entry.id,
+            entryType: entry.type,
+          });
         }
       }
     }
@@ -328,6 +550,7 @@ export function checkAndTriggerDueReminders(
 
         const timingLabel = formatReminderOffset(reminder.offsetMinutes, lang);
         const typeLabel = isFa ? 'عادت' : 'Habit';
+        const intensity = reminder.intensity || 'normal';
 
         const alert: ActiveReminderAlert = {
           id: firedKey,
@@ -340,18 +563,31 @@ export function checkAndTriggerDueReminders(
           reminderLabel: timingLabel,
           offsetMinutes: reminder.offsetMinutes,
           triggeredAt: nowMs,
+          intensity,
         };
 
         onTrigger(alert);
 
         if (prefs.reminderSoundEnabled !== false && prefs.soundEffectsEnabled !== false) {
-          soundEngine.playGentleChime();
+          if (intensity === 'strong') {
+            soundEngine.playStrongAlarmPulse();
+          } else {
+            soundEngine.playGentleChime();
+          }
         }
 
         if (prefs.reminderNotificationsEnabled !== false) {
-          const notifTitle = `🔔 ${typeLabel}: ${habit.title}`;
-          const notifBody = `${timingLabel}${habit.time ? ` · ${habit.time}` : ''}`;
-          dispatchBrowserNotification(notifTitle, notifBody, firedKey);
+          const prefix = intensity === 'strong' ? '🚨 [STRONG / شدید] ' : '🔔 ';
+          const notifTitle = `${prefix}${typeLabel}: ${habit.title}`;
+          const notifBody = `${timingLabel}${habit.time ? ` · ${habit.time}` : ''}${
+            intensity === 'strong' ? (isFa ? ' — تکرار مداوم هر ۳ ثانیه' : ' — Repeating every 3s') : ''
+          }`;
+          dispatchBrowserNotification(notifTitle, notifBody, firedKey, intensity, {
+            id: firedKey,
+            reminderId: reminder.id,
+            entryId: habit.id,
+            entryType: 'habit',
+          });
         }
       }
     }
@@ -397,6 +633,7 @@ export function getUpcomingRemindersForDate(
         offsetMinutes: rem.offsetMinutes,
         label: formatReminderOffset(rem.offsetMinutes, lang),
         isPast: triggerDate.getTime() < now.getTime(),
+        intensity: rem.intensity || 'normal',
       });
     }
   }
@@ -436,6 +673,7 @@ export function getUpcomingRemindersForDate(
         offsetMinutes: rem.offsetMinutes,
         label: formatReminderOffset(rem.offsetMinutes, lang),
         isPast: triggerDate.getTime() < now.getTime(),
+        intensity: rem.intensity || 'normal',
       });
     }
   }

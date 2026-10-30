@@ -14,6 +14,7 @@ import {
   RotateCcw,
   Check,
   X,
+  Pencil,
   Eraser,
   ArrowUp,
   ArrowDown,
@@ -67,6 +68,9 @@ import {
   BujoEntry,
   Habit,
   EntryReminder,
+  ReminderIntensity,
+  FocusTimerPreset,
+  DEFAULT_FOCUS_PRESETS,
 } from '../types';
 import { storage, DEFAULT_JOURNAL_CATEGORIES, getTodayDateString } from '../utils/storage';
 import { soundEngine } from '../utils/audioSynth';
@@ -80,6 +84,7 @@ import {
   sendTestReminderNotification,
   getUpcomingRemindersForDate,
   formatReminderOffset,
+  stopStrongReminderInSW,
 } from '../utils/reminderManager';
 
 interface SettingsSectionProps {
@@ -272,6 +277,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
   );
   const [testNotifMessage, setTestNotifMessage] = useState<string | null>(null);
   const [isTestingNotif, setIsTestingNotif] = useState(false);
+  const [activeStrongTest, setActiveStrongTest] = useState(false);
 
   const handleRequestNotificationPermission = async () => {
     soundEngine.playPop();
@@ -283,16 +289,25 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     }
   };
 
-  const handleTestNotification = async () => {
+  const handleTestNotification = async (intensity: ReminderIntensity = 'normal') => {
     setIsTestingNotif(true);
     try {
-      await sendTestReminderNotification(selectedLanguage);
-      setTestNotifMessage(
-        isDraftFa
-          ? 'اعلان آزمایشی و زنگ یادآور با موفقیت فعال شد!'
-          : 'Test reminder notification & audio chime triggered!'
-      );
-      setTimeout(() => setTestNotifMessage(null), 4000);
+      await sendTestReminderNotification(selectedLanguage, intensity);
+      if (intensity === 'strong') {
+        setActiveStrongTest(true);
+        setTestNotifMessage(
+          isDraftFa
+            ? '🚨 یادآور شدید فعال شد (تکرار هر ۳ ثانیه)! برای توقف روی «توقف هشدار» بزنید.'
+            : '🚨 Strong reminder triggered (repeating every 3s)! Tap Stop Test to silence.'
+        );
+      } else {
+        setTestNotifMessage(
+          isDraftFa
+            ? 'اعلان معمولی و زنگ یادآور با موفقیت فعال شد!'
+            : 'Normal reminder notification & gentle audio chime triggered!'
+        );
+      }
+      setTimeout(() => setTestNotifMessage(null), 6000);
     } catch {
       setTestNotifMessage(
         isDraftFa ? 'خطا در ارسال اعلان آزمایشی.' : 'Failed to trigger test reminder.'
@@ -301,6 +316,16 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     } finally {
       setIsTestingNotif(false);
     }
+  };
+
+  const handleStopStrongTest = () => {
+    soundEngine.playPop();
+    stopStrongReminderInSW('lerni-test-strong');
+    setActiveStrongTest(false);
+    setTestNotifMessage(
+      isDraftFa ? 'هشدار آزمایشی شدید متوقف شد.' : 'Strong test alarm stopped.'
+    );
+    setTimeout(() => setTestNotifMessage(null), 3000);
   };
 
   // Active language in current session and draft preview
@@ -672,9 +697,25 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     ? draftPrefs.journalCategories
     : (prefs.journalCategories && prefs.journalCategories.length > 0 ? prefs.journalCategories : DEFAULT_JOURNAL_CATEGORIES);
 
+  const currentFocusPresets: FocusTimerPreset[] = (draftPrefs.customFocusPresets && draftPrefs.customFocusPresets.length > 0)
+    ? draftPrefs.customFocusPresets
+    : (prefs.customFocusPresets && prefs.customFocusPresets.length > 0 ? prefs.customFocusPresets : DEFAULT_FOCUS_PRESETS);
+
   const initialNavOrder = (prefs.navOrder && prefs.navOrder.length === 5) ? prefs.navOrder : DEFAULT_NAV_ORDER;
   const initialFocusTabOrder = (prefs.focusTabOrder && prefs.focusTabOrder.length === 2) ? prefs.focusTabOrder : DEFAULT_FOCUS_TAB_ORDER;
   const initialCategories = (prefs.journalCategories && prefs.journalCategories.length > 0) ? prefs.journalCategories : DEFAULT_JOURNAL_CATEGORIES;
+  const initialFocusPresets = (prefs.customFocusPresets && prefs.customFocusPresets.length > 0) ? prefs.customFocusPresets : DEFAULT_FOCUS_PRESETS;
+
+  // Preset Editor Modal state inside Settings
+  const [showSettingsPresetModal, setShowSettingsPresetModal] = useState(false);
+  const [settingsEditingPreset, setSettingsEditingPreset] = useState<FocusTimerPreset | null>(null);
+  const [settingsIsCreatingPreset, setSettingsIsCreatingPreset] = useState(false);
+  const [settingsPresetLabel, setSettingsPresetLabel] = useState('');
+  const [settingsPresetMinutes, setSettingsPresetMinutes] = useState(25);
+  const [settingsPresetIcon, setSettingsPresetIcon] = useState('🎯');
+  const [settingsPresetDesc, setSettingsPresetDesc] = useState('');
+  const [settingsPresetError, setSettingsPresetError] = useState<string | null>(null);
+  const [settingsPresetSuccess, setSettingsPresetSuccess] = useState<string | null>(null);
 
   // Track if any setting has changed compared to initial prefs
   const hasChanges =
@@ -696,7 +737,8 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     plannerInstructionsInput.trim() !== (prefs.plannerCustomInstructions || '') ||
     JSON.stringify(currentNavOrder) !== JSON.stringify(initialNavOrder) ||
     JSON.stringify(currentFocusTabOrder) !== JSON.stringify(initialFocusTabOrder) ||
-    JSON.stringify(currentCategories) !== JSON.stringify(initialCategories);
+    JSON.stringify(currentCategories) !== JSON.stringify(initialCategories) ||
+    JSON.stringify(currentFocusPresets) !== JSON.stringify(initialFocusPresets);
 
   // Apply all draft settings and return
   const handleDone = () => {
@@ -729,6 +771,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
       customOpenAiApiVersion: cleanCustomApiVersion,
       useSharedFreeKey: false,
       plannerCustomInstructions: plannerInstructionsInput.trim(),
+      customFocusPresets: currentFocusPresets,
     };
     if (targetLang !== language) {
       setLanguage(targetLang);
@@ -742,6 +785,97 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
     soundEngine.playPop();
     // Do not call onUpdatePrefs — all draft modifications are discarded!
     onBack();
+  };
+
+  // Focus Timer Preset Handlers for Settings View
+  const handleOpenSettingsAddPreset = () => {
+    soundEngine.playPop();
+    setSettingsEditingPreset(null);
+    setSettingsIsCreatingPreset(true);
+    setSettingsPresetLabel('');
+    setSettingsPresetMinutes(25);
+    setSettingsPresetIcon('🎯');
+    setSettingsPresetDesc('');
+    setSettingsPresetError(null);
+    setShowSettingsPresetModal(true);
+  };
+
+  const handleOpenSettingsEditPreset = (p: FocusTimerPreset) => {
+    soundEngine.playPop();
+    setSettingsEditingPreset(p);
+    setSettingsIsCreatingPreset(false);
+    setSettingsPresetLabel(p.label);
+    setSettingsPresetMinutes(p.minutes);
+    setSettingsPresetIcon(p.icon || '⏱️');
+    setSettingsPresetDesc(p.desc || '');
+    setSettingsPresetError(null);
+    setShowSettingsPresetModal(true);
+  };
+
+  const handleSaveSettingsPreset = () => {
+    const cleanLabel = settingsPresetLabel.trim();
+    if (!cleanLabel) {
+      setSettingsPresetError(isDraftFa ? 'لطفاً نام پیش‌تنظیم را وارد کنید.' : 'Please enter a preset name.');
+      return;
+    }
+    const cleanMins = Math.max(0, Math.min(360, Number(settingsPresetMinutes) || 0));
+    const cleanIcon = settingsPresetIcon.trim() || '⏱️';
+    const cleanDesc = settingsPresetDesc.trim() || undefined;
+
+    let next: FocusTimerPreset[];
+    if (settingsIsCreatingPreset) {
+      const newPreset: FocusTimerPreset = {
+        id: `preset_${Date.now()}`,
+        label: cleanLabel,
+        minutes: cleanMins,
+        icon: cleanIcon,
+        desc: cleanDesc,
+      };
+      next = [...currentFocusPresets, newPreset];
+    } else if (settingsEditingPreset) {
+      next = currentFocusPresets.map((p) =>
+        p.id === settingsEditingPreset.id
+          ? {
+              ...p,
+              label: cleanLabel,
+              minutes: cleanMins,
+              icon: cleanIcon,
+              desc: cleanDesc,
+            }
+          : p
+      );
+    } else {
+      return;
+    }
+
+    soundEngine.playGentleChime();
+    setDraftPrefs((prev) => ({ ...prev, customFocusPresets: next }));
+    onUpdatePrefs({ customFocusPresets: next });
+    setSettingsPresetSuccess(isDraftFa ? 'پیش‌تنظیم با موفقیت ذخیره شد!' : 'Preset saved successfully!');
+    setTimeout(() => setSettingsPresetSuccess(null), 3000);
+    setShowSettingsPresetModal(false);
+  };
+
+  const handleDeleteSettingsPreset = (presetId: string) => {
+    if (currentFocusPresets.length <= 1) {
+      setSettingsPresetError(isDraftFa ? 'حداقل یک پیش‌تنظیم باید حفظ شود.' : 'At least one preset must be kept.');
+      return;
+    }
+    soundEngine.playPop();
+    const next = currentFocusPresets.filter((p) => p.id !== presetId);
+    setDraftPrefs((prev) => ({ ...prev, customFocusPresets: next }));
+    onUpdatePrefs({ customFocusPresets: next });
+    setSettingsPresetSuccess(isDraftFa ? 'پیش‌تنظیم حذف شد.' : 'Preset removed.');
+    setTimeout(() => setSettingsPresetSuccess(null), 3000);
+  };
+
+  const handleResetSettingsPresets = () => {
+    soundEngine.playPop();
+    setDraftPrefs((prev) => ({ ...prev, customFocusPresets: DEFAULT_FOCUS_PRESETS }));
+    onUpdatePrefs({ customFocusPresets: DEFAULT_FOCUS_PRESETS });
+    setSettingsPresetSuccess(isDraftFa ? 'پیش‌تنظیم‌ها به پیش‌فرض بازگشتند.' : 'Presets restored to defaults.');
+    setTimeout(() => setSettingsPresetSuccess(null), 3000);
+    setShowSettingsPresetModal(false);
   };
 
   // Reorder Navigation Section Handlers
@@ -2415,14 +2549,14 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-display text-sm sm:text-base font-bold text-[#151E14] dark:text-[#E8F2E4]">
-                      {t('settings.timerTabOrderSection', 'Timer Tabs Order')}
+                      {isDraftFa ? 'زبانه و پیش‌تنظیم‌های تایمر' : 'Timer Tabs & Focus Presets'}
                     </h3>
                     <span className="text-[11px] font-semibold text-[#3B7E10] dark:text-[#80D141] px-2 py-0.5 rounded-full bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/30">
-                      {currentFocusTabOrder[0] === 'focus' ? (isDraftFa ? 'تمرکز اول' : 'Focus First') : (isDraftFa ? 'ردیاب اول' : 'Tracker First')}
+                      {isDraftFa ? `${currentFocusPresets.length} پیش‌تنظیم` : `${currentFocusPresets.length} presets`}
                     </span>
                   </div>
                   <p className="text-xs text-[#485B44] dark:text-[#9EB598] truncate">
-                    {t('settings.timerTabOrderDesc', 'Reorder Focus and Tracker in the Timer section')}
+                    {isDraftFa ? 'ترتیب زبانه‌ها و ویرایش/افزودن پیش‌تنظیم‌های تمرکز' : 'Reorder tabs and customize focus timer presets'}
                   </p>
                 </div>
               </div>
@@ -2454,9 +2588,12 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                   exit={{ height: 0, opacity: 0 }}
                   transition={{ duration: 0.22, ease: 'easeInOut' }}
                 >
-                  <div className="px-5 pb-5 sm:px-6 sm:pb-6 pt-2 border-t border-[#DCEAD4]/80 dark:border-[#263722] space-y-4">
-                    {/* Interactive Reordering List */}
+                  <div className="px-5 pb-5 sm:px-6 sm:pb-6 pt-2 border-t border-[#DCEAD4]/80 dark:border-[#263722] space-y-6">
+                    {/* Tab 1: Interactive Reordering List */}
                     <div className="space-y-2 pt-1">
+                      <div className="text-xs font-bold text-[#485B44] dark:text-[#9EB598] uppercase tracking-wider mb-2">
+                        {t('settings.timerTabOrderSection', 'Timer Tabs Order')}
+                      </div>
                       {currentFocusTabOrder.map((tabId, index) => {
                         const isFocus = tabId === 'focus';
                         const icon = isFocus ? <Timer className="w-5 h-5" /> : <Clock className="w-5 h-5" />;
@@ -2522,8 +2659,270 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                         );
                       })}
                     </div>
+
+                    {/* Part 2: Focus Timer Presets Customization */}
+                    <div className="pt-4 border-t border-[#DCEAD4]/80 dark:border-[#263722] space-y-3">
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-sm text-[#151E14] dark:text-[#E8F2E4]">
+                              {t('focus.presetsTitle', 'Focus Timer Presets')}
+                            </h4>
+                            <span className="text-[11px] font-semibold text-[#3B7E10] dark:text-[#80D141] px-2 py-0.5 rounded-full bg-[#E8F8D8] dark:bg-[#1E3800] border border-[#80D141]/30">
+                              {isDraftFa ? `${toPersianDigits(currentFocusPresets.length)} پیش‌تنظیم` : `${currentFocusPresets.length} presets`}
+                            </span>
+                          </div>
+                          <p className="text-xs text-[#485B44] dark:text-[#9EB598] mt-0.5">
+                            {t('focus.presetsDesc', 'Customize, add, or delete the timer durations and modes available in your focus sessions.')}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            id="btn-settings-add-preset"
+                            onClick={handleOpenSettingsAddPreset}
+                            className="px-3 py-1.5 rounded-xl bg-[#80D141] hover:bg-[#72BF36] text-[#0F2600] text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>{t('focus.addPreset', 'Add Preset')}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleResetSettingsPresets}
+                            className="px-2.5 py-1.5 rounded-xl bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] dark:hover:bg-[#283A23] text-[#245209] dark:text-[#80D141] text-xs font-bold border border-[#DCEAD4] dark:border-[#263722] flex items-center gap-1.5 transition-colors cursor-pointer"
+                            title={t('focus.resetPresets', 'Reset to Defaults')}
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">{t('focus.resetPresets', 'Reset to Defaults')}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Success / Error Messages in Settings */}
+                      {settingsPresetSuccess && (
+                        <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-xs font-bold text-emerald-800 dark:text-emerald-200 flex items-center gap-2">
+                          <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          <span>{settingsPresetSuccess}</span>
+                        </div>
+                      )}
+
+                      {settingsPresetError && (
+                        <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 text-xs font-bold text-rose-800 dark:text-rose-200 flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                          <span>{settingsPresetError}</span>
+                        </div>
+                      )}
+
+                      {/* Presets List in Settings */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                        {currentFocusPresets.map((preset) => (
+                          <div
+                            key={preset.id}
+                            className="p-3 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] flex items-center justify-between gap-2.5 group"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="w-9 h-9 rounded-xl bg-white dark:bg-[#263722] border border-[#DCEAD4] dark:border-[#33482E] flex items-center justify-center text-lg shrink-0 shadow-2xs">
+                                {preset.icon || '⏱️'}
+                              </span>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <h5 className="font-bold text-xs text-[#151E14] dark:text-[#E8F2E4] truncate">
+                                    {preset.label}
+                                  </h5>
+                                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-[#EDF6E8] dark:bg-[#233520] text-[#3B7E10] dark:text-[#80D141] border border-[#D0E2C8] dark:border-[#2E432A]">
+                                    {preset.minutes === 0
+                                      ? (isDraftFa ? 'فلومودورو' : 'Flowmodoro')
+                                      : `${isDraftFa ? toPersianDigits(preset.minutes) : preset.minutes} ${t('focus.minsUnit')}`}
+                                  </span>
+                                </div>
+                                {preset.desc && (
+                                  <p className="text-[10px] text-[#485B44] dark:text-[#9EB598] truncate mt-0.5">
+                                    {preset.desc}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenSettingsEditPreset(preset)}
+                                className="p-1.5 rounded-lg bg-white dark:bg-[#263722] hover:bg-[#E8F8D8] dark:hover:bg-[#2E4229] text-[#485B44] dark:text-[#9EB598] hover:text-[#151E14] dark:hover:text-[#E8F2E4] border border-[#DCEAD4] dark:border-[#33482E] transition-all cursor-pointer shadow-2xs"
+                                title={t('focus.editPreset', 'Edit Preset')}
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSettingsPreset(preset.id)}
+                                disabled={currentFocusPresets.length <= 1}
+                                className="p-1.5 rounded-lg bg-white dark:bg-[#263722] hover:bg-rose-50 dark:hover:bg-rose-950/40 text-[#485B44] dark:text-[#9EB598] hover:text-rose-600 dark:hover:text-rose-400 border border-[#DCEAD4] dark:border-[#33482E] disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs"
+                                title={t('focus.deletePreset', 'Delete Preset')}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Modal for Adding/Editing Preset from Settings */}
+            <AnimatePresence>
+              {showSettingsPresetModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                    className="w-full max-w-md bg-white dark:bg-[#182316] rounded-3xl p-5 sm:p-6 shadow-2xl border border-[#DCEAD4] dark:border-[#263722] max-h-[90vh] flex flex-col overflow-hidden"
+                  >
+                    <div className="flex items-center justify-between pb-3 border-b border-[#DCEAD4] dark:border-[#263722] shrink-0">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1E4300] dark:text-[#80D141] flex items-center justify-center">
+                          {settingsIsCreatingPreset ? <Plus className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
+                        </div>
+                        <h4 className="font-bold text-sm sm:text-base text-[#151E14] dark:text-[#E8F2E4]">
+                          {settingsIsCreatingPreset ? t('focus.addPreset', 'Add Preset') : t('focus.editPreset', 'Edit Preset')}
+                        </h4>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowSettingsPresetModal(false)}
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-[#485B44] dark:text-[#9EB598] hover:bg-[#EDF6E8] dark:hover:bg-[#202E1E] transition-colors cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {settingsPresetError && (
+                      <div className="mt-3 p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 text-xs font-bold text-rose-800 dark:text-rose-200 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                        <span>{settingsPresetError}</span>
+                      </div>
+                    )}
+
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleSaveSettingsPreset();
+                      }}
+                      className="flex-1 overflow-y-auto py-4 space-y-4"
+                    >
+                      <div>
+                        <label className="block text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] mb-1">
+                          {t('focus.presetName', 'Preset Name')} *
+                        </label>
+                        <input
+                          type="text"
+                          value={settingsPresetLabel}
+                          onChange={(e) => setSettingsPresetLabel(e.target.value)}
+                          placeholder={t('focus.presetNamePlaceholder', 'e.g. Ultra Deep Work, Power Nap...')}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7FAF4] dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+                          required
+                          autoFocus
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] mb-1">
+                          {t('focus.presetMinutes', 'Duration (Minutes, 0 for Flowmodoro)')} *
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min={0}
+                            max={360}
+                            value={settingsPresetMinutes}
+                            onChange={(e) => setSettingsPresetMinutes(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                            className="w-28 px-3.5 py-2.5 rounded-xl bg-[#F7FAF4] dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141] font-mono text-center"
+                            required
+                          />
+                          <span className="text-xs text-[#485B44] dark:text-[#9EB598]">
+                            {settingsPresetMinutes === 0
+                              ? (isDraftFa ? '🚀 شمارش رو به بالا (فلومودورو)' : '🚀 Count-up open flowmodoro')
+                              : (isDraftFa ? `${toPersianDigits(settingsPresetMinutes)} دقیقه` : `${settingsPresetMinutes} mins`)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] mb-1">
+                          {t('focus.presetIcon', 'Emoji Icon')}
+                        </label>
+                        <div className="flex items-center gap-2 mb-2">
+                          <input
+                            type="text"
+                            value={settingsPresetIcon}
+                            onChange={(e) => setSettingsPresetIcon(e.target.value)}
+                            maxLength={4}
+                            className="w-14 h-10 rounded-xl bg-[#F7FAF4] dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-lg text-center focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+                          />
+                          <span className="text-[11px] text-[#485B44] dark:text-[#9EB598]">
+                            {isDraftFa ? 'پیشنهادی:' : 'Suggestions:'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {['⚡', '🎯', '🍅', '🌊', '🚀', '⏱️', '🧘', '☕', '💡', '🔥', '🏆', '🧠', '📚', '💻', '🌿', '✨'].map((emoji) => (
+                            <button
+                              key={emoji}
+                              type="button"
+                              onClick={() => {
+                                soundEngine.playPop();
+                                setSettingsPresetIcon(emoji);
+                              }}
+                              className={`w-7 h-7 rounded-lg text-sm flex items-center justify-center transition-all cursor-pointer ${
+                                settingsPresetIcon === emoji
+                                  ? 'bg-[#80D141] scale-110 shadow-xs'
+                                  : 'bg-[#F7FAF4] dark:bg-[#22301F] hover:bg-[#E8F8D8] dark:hover:bg-[#2A3E26]'
+                              }`}
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] mb-1">
+                          {t('focus.presetDesc', 'Description (Optional)')}
+                        </label>
+                        <input
+                          type="text"
+                          value={settingsPresetDesc}
+                          onChange={(e) => setSettingsPresetDesc(e.target.value)}
+                          placeholder={t('focus.presetDescPlaceholder', 'e.g. 60 min sustained deep flow')}
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#F7FAF4] dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#DCEAD4] dark:border-[#263722]">
+                        <button
+                          type="button"
+                          onClick={() => setShowSettingsPresetModal(false)}
+                          className="px-4 py-2 rounded-xl text-xs font-bold text-[#485B44] dark:text-[#9EB598] hover:bg-[#EDF6E8] dark:hover:bg-[#253522] transition-colors cursor-pointer"
+                        >
+                          {isDraftFa ? 'انصراف' : 'Cancel'}
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-5 py-2 rounded-xl bg-[#80D141] hover:bg-[#72BF36] text-[#0F2600] text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>{isDraftFa ? 'ذخیره پیش‌تنظیم' : 'Save Preset'}</span>
+                        </button>
+                      </div>
+                    </form>
+                  </motion.div>
+                </div>
               )}
             </AnimatePresence>
           </section>
@@ -2836,9 +3235,9 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                   transition={{ duration: 0.22, ease: 'easeInOut' }}
                 >
                   <div className="px-5 pb-5 sm:px-6 sm:pb-6 pt-2 border-t border-[#DCEAD4]/80 dark:border-[#263722] space-y-4">
-                    {/* System Permission Card */}
-                    <div className="p-3.5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] space-y-2.5">
-                      <div className="flex items-start justify-between gap-3">
+                    {/* System Permission & Test Triggers Card */}
+                    <div className="p-3.5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] space-y-3">
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
                         <div className="text-xs">
                           <div className="font-bold text-[#151E14] dark:text-[#E8F2E4]">
                             {t('settings.systemNotifications', 'Desktop & Mobile System Notifications')}
@@ -2864,12 +3263,78 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                         )}
                       </div>
 
+                      {/* Interactive Test Triggers for Normal and Strong Intensity */}
+                      <div className="pt-2 border-t border-[#DCEAD4]/70 dark:border-[#263722]/70 flex flex-wrap items-center gap-2">
+                        <span className="text-[11px] font-bold text-[#485B44] dark:text-[#9EB598]">
+                          {isDraftFa ? 'آزمایش یادآور:' : 'Test Alarm:'}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => handleTestNotification('normal')}
+                          disabled={isTestingNotif}
+                          className="px-3 py-1.5 rounded-xl bg-white dark:bg-[#202E1E] hover:bg-[#E8F8D8] dark:hover:bg-[#2A3E26] text-[#1E4300] dark:text-[#A2EB68] text-xs font-bold border border-[#DCEAD4] dark:border-[#2C4027] flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-95"
+                          title="Trigger a single gentle reminder chime & notification"
+                        >
+                          <Bell className="w-3.5 h-3.5" />
+                          <span>{t('reminders.testNormal', 'Test Normal Reminder')}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleTestNotification('strong')}
+                          disabled={isTestingNotif}
+                          className="px-3 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 text-xs font-bold border border-rose-200 dark:border-rose-900/60 flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-95"
+                          title="Trigger urgent pulses that repeat every 3s until dismissed or snoozed"
+                        >
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                          </span>
+                          <span>{t('reminders.testStrong', 'Test Strong (3s Repeat)')}</span>
+                        </button>
+
+                        {activeStrongTest && (
+                          <button
+                            type="button"
+                            onClick={handleStopStrongTest}
+                            className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95 animate-pulse"
+                            title="Stop active 3-second test alarm loop"
+                          >
+                            <VolumeX className="w-3.5 h-3.5" />
+                            <span>{t('reminders.stopTestStrong', 'Stop Test Alarm')}</span>
+                          </button>
+                        )}
+                      </div>
+
                       {testNotifMessage && (
                         <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-800 text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
                           <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                           <span>{testNotifMessage}</span>
                         </div>
                       )}
+                    </div>
+
+                    {/* Educational Guide: Reminder Urgency & Background Execution */}
+                    <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/25 border border-amber-200/80 dark:border-amber-900/40 text-xs space-y-2">
+                      <div className="font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                        <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                        <span>{isDraftFa ? 'آشنایی با نحوه کارکرد یادآورها و اجرای بدون نیاز به باز بودن برنامه' : 'Reminder Urgency Modes & Closed-App Reliability'}</span>
+                      </div>
+                      <div className="text-[11px] text-amber-950/90 dark:text-amber-200/90 space-y-1.5 leading-relaxed">
+                        <div className="flex items-start gap-2">
+                          <span className="font-bold text-slate-800 dark:text-slate-200 shrink-0">🔔 {t('reminders.normal', 'Normal')}:</span>
+                          <span>{t('reminders.normalDesc', 'Single chime & notification at scheduled time')}</span>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <span className="font-bold text-rose-700 dark:text-rose-300 shrink-0">🚨 {t('reminders.strong', 'Strong')}:</span>
+                          <span>{t('reminders.strongDesc', 'Urgent pulses & repeats every 3s until opened, dismissed or snoozed')}</span>
+                        </div>
+                        <div className="pt-2 border-t border-amber-200/60 dark:border-amber-900/40 text-[10.5px] text-[#485B44] dark:text-[#9EB598] flex items-start gap-1.5">
+                          <span className="shrink-0">🛡️</span>
+                          <span>{t('reminders.closedAppNotice', 'Reminders run even when Lerni is closed (via Service Worker background alarms & OS notification triggers).')}</span>
+                        </div>
+                      </div>
                     </div>
 
                     {/* Master System Push Toggle */}
@@ -2974,15 +3439,28 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                                 </div>
                               </div>
 
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                                item.isPast
-                                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-500'
-                                  : 'bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1C3700] dark:text-[#80D141] border border-[#80D141]/30'
-                              }`}>
-                                {item.isPast
-                                  ? (isDraftFa ? 'گذشته' : 'Past')
-                                  : (isDraftFa ? 'پیش‌رو' : 'Upcoming')}
-                              </span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {item.intensity === 'strong' ? (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span>
+                                    <span>{isDraftFa ? '🚨 شدید' : '🚨 Strong'}</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#EDF6E8] dark:bg-[#1C281A] text-[#3B4E37] dark:text-[#A8C4A0] border border-[#DCEAD4] dark:border-[#2A3E26]">
+                                    <span>{isDraftFa ? '🔔 معمولی' : '🔔 Normal'}</span>
+                                  </span>
+                                )}
+
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                                  item.isPast
+                                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-500'
+                                    : 'bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1C3700] dark:text-[#80D141] border border-[#80D141]/30'
+                                }`}>
+                                  {item.isPast
+                                    ? (isDraftFa ? 'گذشته' : 'Past')
+                                    : (isDraftFa ? 'پیش‌رو' : 'Upcoming')}
+                                </span>
+                              </div>
                             </div>
                           ))}
                         </div>

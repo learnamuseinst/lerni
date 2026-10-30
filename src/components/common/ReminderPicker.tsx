@@ -11,7 +11,7 @@ import {
   ChevronDown,
   Volume2
 } from 'lucide-react';
-import { EntryReminder, Language } from '../../types';
+import { EntryReminder, Language, ReminderIntensity } from '../../types';
 import { 
   REMINDER_PRESETS, 
   formatReminderOffset, 
@@ -39,6 +39,7 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
 }) => {
   const { t, language } = useI18n();
   const isFa = language === 'fa';
+  const [selectedIntensity, setSelectedIntensity] = useState<ReminderIntensity>('normal');
   const [isAddingCustom, setIsAddingCustom] = useState(false);
   const [customMinutesInput, setCustomMinutesInput] = useState('45');
   const [permission, setPermission] = useState(getNotificationPermission());
@@ -51,7 +52,7 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
 
   const handleAddPreset = (offsetMinutes: number) => {
     soundEngine.playPop();
-    // Don't duplicate exact same offset
+    // Don't duplicate exact same offset with same intensity
     if (reminders.some((r) => r.offsetMinutes === offsetMinutes)) return;
 
     const newReminder: EntryReminder = {
@@ -59,6 +60,7 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
       offsetMinutes,
       enabled: true,
       label: formatReminderOffset(offsetMinutes, language),
+      intensity: selectedIntensity,
     };
 
     onChange([...reminders, newReminder]);
@@ -80,6 +82,7 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
       offsetMinutes: mins,
       enabled: true,
       label: formatReminderOffset(mins, language),
+      intensity: selectedIntensity,
     };
 
     onChange([...reminders, newReminder]);
@@ -97,6 +100,18 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
       reminders.map((r) =>
         r.id === id ? { ...r, enabled: r.enabled === false ? true : false } : r
       )
+    );
+  };
+
+  const handleToggleIntensity = (id: string) => {
+    soundEngine.playPop();
+    onChange(
+      reminders.map((r) => {
+        if (r.id !== id) return r;
+        const current = r.intensity || 'normal';
+        const next: ReminderIntensity = current === 'normal' ? 'strong' : 'normal';
+        return { ...r, intensity: next };
+      })
     );
   };
 
@@ -126,6 +141,69 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
         )}
       </div>
 
+      {/* Intensity Selector: Normal vs Strong */}
+      <div className="p-2.5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-1.5">
+            <span>{isFa ? 'نوع و شدت یادآور:' : 'Reminder Type:'}</span>
+          </span>
+          <span className="text-[10px] text-[#485B44] dark:text-[#9EB598]">
+            {selectedIntensity === 'strong'
+              ? (isFa ? 'تکرار مداوم هر ۳ ثانیه' : 'Repeats every 3s')
+              : (isFa ? 'یک اعلان در زمان مشخص' : 'Single notification')}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-1.5">
+          {/* Normal Mode */}
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.playPop();
+              setSelectedIntensity('normal');
+            }}
+            className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              selectedIntensity === 'normal'
+                ? 'bg-[#80D141] text-[#0F2600] border-[#80D141] shadow-xs'
+                : 'bg-white dark:bg-[#202E1E] text-[#485B44] dark:text-[#9EB598] border-[#DCEAD4] dark:border-[#2C4027] hover:bg-[#EDF6E8]'
+            }`}
+          >
+            <Bell className="w-3.5 h-3.5" />
+            <span>{isFa ? 'معمولی (یک اعلان)' : 'Normal (1 Alert)'}</span>
+          </button>
+
+          {/* Strong Mode */}
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.playPop();
+              setSelectedIntensity('strong');
+            }}
+            className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              selectedIntensity === 'strong'
+                ? 'bg-rose-600 text-white border-rose-600 shadow-sm shadow-rose-500/30'
+                : 'bg-white dark:bg-[#202E1E] text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900/50 hover:bg-rose-50 dark:hover:bg-rose-950/30'
+            }`}
+          >
+            <span className="relative flex h-2 w-2">
+              {selectedIntensity === 'strong' && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+              )}
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-current"></span>
+            </span>
+            <span>{isFa ? 'شدید (تکرار ۳ ثانیه)' : 'Strong (3s Repeat)'}</span>
+          </button>
+        </div>
+
+        {selectedIntensity === 'strong' && (
+          <p className="text-[10px] text-rose-700 dark:text-rose-300 leading-relaxed font-medium">
+            {isFa
+              ? '🚨 یادآور شدید: تا زمان ورود به برنامه و زدن دکمه رد یا تعویق، هر ۳ ثانیه اعلان تکرار می‌شود (حتی در زمان بسته بودن برنامه).'
+              : '🚨 Strong mode: Keeps sending notifications every 3 seconds until you enter the app and dismiss or snooze (works even if closed).'}
+          </p>
+        )}
+      </div>
+
       {/* Untimed Notice Hint */}
       {!targetTime && itemType !== 'habit' && (
         <div className="p-2.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-900/40 text-[11px] text-amber-900 dark:text-amber-200 flex items-center gap-2">
@@ -140,54 +218,88 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
 
       {/* Existing Attached Reminders Chips */}
       {reminders.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
-          {reminders.map((reminder) => {
-            const isEnabled = reminder.enabled !== false;
-            const offsetLabel = formatReminderOffset(reminder.offsetMinutes, language);
+        <div className="space-y-1.5">
+          <span className="text-[10px] font-bold text-[#485B44] dark:text-[#9EB598] block">
+            {isFa ? 'یادآورهای فعال برای این مورد (برای تغییر شدت کلیک کنید):' : 'Active reminders (click intensity badge to toggle):'}
+          </span>
 
-            return (
-              <div
-                key={reminder.id}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-2xs ${
-                  isEnabled
-                    ? 'bg-[#E8F8D8] dark:bg-[#1C3317] border-[#80D141]/60 text-[#153400] dark:text-[#B1F082]'
-                    : 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-500 opacity-60'
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => handleToggleReminder(reminder.id)}
-                  className="hover:opacity-80 flex items-center gap-1 cursor-pointer"
-                  title={isEnabled ? (isFa ? 'غیرفعال‌سازی' : 'Disable') : (isFa ? 'فعال‌سازی' : 'Enable')}
-                >
-                  <Bell className="w-3 h-3 fill-current" />
-                  <span>{offsetLabel}</span>
-                </button>
+          <div className="flex flex-wrap gap-2">
+            {reminders.map((reminder) => {
+              const isEnabled = reminder.enabled !== false;
+              const isStrong = reminder.intensity === 'strong';
+              const offsetLabel = formatReminderOffset(reminder.offsetMinutes, language);
 
-                <button
-                  type="button"
-                  onClick={() => handleRemoveReminder(reminder.id)}
-                  className="p-0.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 text-inherit transition-colors cursor-pointer"
-                  title={isFa ? 'حذف این یادآور' : 'Remove reminder'}
+              return (
+                <div
+                  key={reminder.id}
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-2xs ${
+                    !isEnabled
+                      ? 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-500 opacity-60'
+                      : isStrong
+                      ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800/80 text-rose-900 dark:text-rose-200 shadow-rose-500/10'
+                      : 'bg-[#E8F8D8] dark:bg-[#1C3317] border-[#80D141]/60 text-[#153400] dark:text-[#B1F082]'
+                  }`}
                 >
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              </div>
-            );
-          })}
+                  {/* Toggle on/off */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleReminder(reminder.id)}
+                    className="hover:opacity-80 flex items-center gap-1 cursor-pointer"
+                    title={isEnabled ? (isFa ? 'غیرفعال‌سازی' : 'Disable') : (isFa ? 'فعال‌سازی' : 'Enable')}
+                  >
+                    <Bell className="w-3 h-3 fill-current" />
+                    <span>{offsetLabel}</span>
+                  </button>
+
+                  {/* Toggle Intensity Badge (Normal vs Strong) */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleIntensity(reminder.id)}
+                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-transform active:scale-90 cursor-pointer flex items-center gap-1 ${
+                      isStrong
+                        ? 'bg-rose-600 text-white shadow-2xs'
+                        : 'bg-white/80 dark:bg-[#202E1E] text-[#1E4300] dark:text-[#80D141] border border-[#80D141]/40'
+                    }`}
+                    title={isFa ? 'کلیک کنید برای جابجایی بین معمولی و شدید' : 'Click to toggle Normal / Strong'}
+                  >
+                    {isStrong ? (
+                      <>
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                        <span>{isFa ? 'شدید (۳ث)' : 'Strong (3s)'}</span>
+                      </>
+                    ) : (
+                      <span>{isFa ? 'معمولی' : 'Normal'}</span>
+                    )}
+                  </button>
+
+                  {/* Remove Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveReminder(reminder.id)}
+                    className="p-0.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 text-inherit transition-colors cursor-pointer"
+                    title={isFa ? 'حذف این یادآور' : 'Remove reminder'}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : (
         <p className="text-[11px] text-[#485B44] dark:text-[#9EB598]">
           {isFa
-            ? 'یادآوری تنظیم نشده است. می‌توانید یک یا چند اعلان (مثلاً ۳۰ دقیقه قبل و در زمان شروع) بیفزایید.'
-            : 'No reminders set. You can attach multiple notifications (e.g. 30 mins before + at time).'}
+            ? 'یادآوری تنظیم نشده است. نوع شدت (معمولی یا شدید) را انتخاب و یکی از زمان‌های زیر را بیفزایید.'
+            : 'No reminders set. Pick an intensity (Normal or Strong) and attach one or more timing presets.'}
         </p>
       )}
 
       {/* Quick Add Preset Buttons */}
       <div className="space-y-1.5 pt-1">
         <span className="text-[10px] font-bold text-[#485B44] dark:text-[#9EB598] block">
-          {isFa ? 'افزودن یادآور:' : 'Add a reminder:'}
+          {isFa
+            ? `افزودن یادآور با شدت انتخاب‌شده (${selectedIntensity === 'strong' ? 'شدید 🚨' : 'معمولی 🔔'}):`
+            : `Add timing preset (${selectedIntensity === 'strong' ? 'Strong 🚨' : 'Normal 🔔'}):`}
         </span>
 
         <div className="flex flex-wrap gap-1.5">
@@ -204,6 +316,8 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
                 className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border flex items-center gap-1 transition-all cursor-pointer ${
                   isAlreadyAdded
                     ? 'bg-[#80D141]/20 border-[#80D141]/40 text-[#1C3700] dark:text-[#80D141] opacity-50 cursor-default'
+                    : selectedIntensity === 'strong'
+                    ? 'bg-rose-50/70 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-rose-800 dark:text-rose-300 border-rose-200 dark:border-rose-900/60'
                     : 'bg-[#F7FAF4] dark:bg-[#1C2919] hover:bg-[#E2F2D9] dark:hover:bg-[#283C25] text-[#2F6B12] dark:text-[#9DD97A] border-[#DCEAD4] dark:border-[#2A3E26]'
                 }`}
               >

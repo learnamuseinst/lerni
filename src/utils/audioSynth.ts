@@ -285,6 +285,40 @@ class SoundEngine {
       console.warn("Audio reminder alert error:", e);
     }
   }
+
+  public playStrongAlarmPulse() {
+    if (!this.effectsEnabled) return;
+    try {
+      this.initContext();
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime;
+      // Urgent, clear dual-pulse beacon: 880Hz (A5) -> 1046.5Hz (C6) -> 880Hz (A5)
+      const pulses = [
+        { freq: 880, delay: 0 },
+        { freq: 1046.5, delay: 0.12 },
+        { freq: 880, delay: 0.24 },
+      ];
+      pulses.forEach(({ freq, delay }) => {
+        const osc = this.ctx!.createOscillator();
+        const noteGain = this.ctx!.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + delay);
+
+        noteGain.gain.setValueAtTime(0.001, now + delay);
+        noteGain.gain.exponentialRampToValueAtTime(0.3, now + delay + 0.02);
+        noteGain.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.28);
+
+        osc.connect(noteGain);
+        noteGain.connect(this.ctx!.destination);
+
+        osc.start(now + delay);
+        osc.stop(now + delay + 0.3);
+      });
+    } catch (e) {
+      console.warn("Strong alarm audio error:", e);
+    }
+  }
 }
 
 export const soundEngine = new SoundEngine();

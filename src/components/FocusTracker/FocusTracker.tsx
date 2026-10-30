@@ -16,9 +16,15 @@ import {
   TrendingUp,
   Award,
   Clock,
-  Layers
+  Layers,
+  Plus,
+  Pencil,
+  Trash2,
+  X,
+  Check,
+  AlertCircle
 } from 'lucide-react';
-import { FocusTimerMode, FocusSession, AmbientSoundType, UserPreferences, FocusTab, DEFAULT_FOCUS_TAB_ORDER } from '../../types';
+import { FocusTimerMode, FocusSession, AmbientSoundType, UserPreferences, FocusTab, DEFAULT_FOCUS_TAB_ORDER, FocusTimerPreset, DEFAULT_FOCUS_PRESETS } from '../../types';
 import { getTodayDateString } from '../../utils/storage';
 import { soundEngine } from '../../utils/audioSynth';
 import { useI18n, toPersianDigits } from '../../utils/i18n';
@@ -35,6 +41,7 @@ interface FocusTrackerProps {
   onUpdatePrefs: (updated: Partial<UserPreferences>) => void;
   setIsRunningToNav?: (isRunning: boolean) => void;
   focusTabOrder?: FocusTab[];
+  customFocusPresets?: FocusTimerPreset[];
 }
 
 export const FocusTracker: React.FC<FocusTrackerProps> = ({
@@ -48,6 +55,7 @@ export const FocusTracker: React.FC<FocusTrackerProps> = ({
   onUpdatePrefs,
   setIsRunningToNav,
   focusTabOrder,
+  customFocusPresets,
 }) => {
   const { t, language } = useI18n();
 
@@ -61,7 +69,24 @@ export const FocusTracker: React.FC<FocusTrackerProps> = ({
 
   const hasManuallySelectedTab = useRef(false);
 
-  const [mode, setMode] = useState<FocusTimerMode>('sprint_5');
+  const presetsList: FocusTimerPreset[] = (customFocusPresets && customFocusPresets.length > 0)
+    ? customFocusPresets
+    : DEFAULT_FOCUS_PRESETS;
+
+  // Preset manager modal & form state
+  const [showPresetManagerModal, setShowPresetManagerModal] = useState(false);
+  const [editingPreset, setEditingPreset] = useState<FocusTimerPreset | null>(null);
+  const [isCreatingNewPreset, setIsCreatingNewPreset] = useState(false);
+  const [presetFormLabel, setPresetFormLabel] = useState('');
+  const [presetFormMinutes, setPresetFormMinutes] = useState(25);
+  const [presetFormIcon, setPresetFormIcon] = useState('⚡');
+  const [presetFormDesc, setPresetFormDesc] = useState('');
+  const [presetFormError, setPresetFormError] = useState<string | null>(null);
+  const [presetSuccessMsg, setPresetSuccessMsg] = useState<string | null>(null);
+
+  const [mode, setMode] = useState<FocusTimerMode>(() => {
+    return presetsList[0]?.id || 'sprint_5';
+  });
   const [customMinutes, setCustomMinutes] = useState(20);
   const [durationSeconds, setDurationSeconds] = useState(5 * 60);
   const [secondsRemaining, setSecondsRemaining] = useState(5 * 60);
@@ -87,14 +112,38 @@ export const FocusTracker: React.FC<FocusTrackerProps> = ({
   const [reflectionRating, setReflectionRating] = useState(4);
   const [reflectionNote, setReflectionNote] = useState('');
 
-  const modes: { id: FocusTimerMode; label: string; minutes: number; icon: string; desc: string }[] = [
-    { id: 'sprint_5', label: t('focus.modeSprint'), minutes: 5, icon: '⚡', desc: t('focus.modeSprintDesc') },
-    { id: 'burst_15', label: t('focus.modeBurst'), minutes: 15, icon: '🎯', desc: t('focus.modeBurstDesc') },
-    { id: 'pomodoro_25', label: t('focus.modePomodoro'), minutes: 25, icon: '🍅', desc: t('focus.modePomodoroDesc') },
-    { id: 'deep_45', label: t('focus.modeDeep'), minutes: 45, icon: '🌊', desc: t('focus.modeDeepDesc') },
-    { id: 'flowmodoro', label: t('focus.modeFlow'), minutes: 0, icon: '🚀', desc: t('focus.modeFlowDesc') },
-    { id: 'custom', label: t('focus.modeCustom'), minutes: 20, icon: '⏱️', desc: t('focus.modeCustomDesc') },
-  ];
+  // Dynamically map presets to modes with bilingual localized fallbacks
+  const modes: { id: FocusTimerMode; label: string; minutes: number; icon: string; desc: string; rawPreset: FocusTimerPreset }[] = presetsList.map((preset) => {
+    let label = preset.label;
+    let desc = preset.desc || '';
+    if (preset.id === 'sprint_5' && preset.label === 'Dopamine Sprint') {
+      label = t('focus.modeSprint');
+      desc = t('focus.modeSprintDesc');
+    } else if (preset.id === 'burst_15' && preset.label === 'Focus Burst') {
+      label = t('focus.modeBurst');
+      desc = t('focus.modeBurstDesc');
+    } else if (preset.id === 'pomodoro_25' && preset.label === 'Pomodoro') {
+      label = t('focus.modePomodoro');
+      desc = t('focus.modePomodoroDesc');
+    } else if (preset.id === 'deep_45' && preset.label === 'Deep Immersion') {
+      label = t('focus.modeDeep');
+      desc = t('focus.modeDeepDesc');
+    } else if (preset.id === 'flowmodoro' && preset.label === 'Flowmodoro') {
+      label = t('focus.modeFlow');
+      desc = t('focus.modeFlowDesc');
+    } else if (preset.id === 'custom' && preset.label === 'Custom') {
+      label = t('focus.modeCustom');
+      desc = t('focus.modeCustomDesc');
+    }
+    return {
+      id: preset.id as FocusTimerMode,
+      label,
+      minutes: preset.minutes,
+      icon: preset.icon,
+      desc,
+      rawPreset: preset,
+    };
+  });
 
   const sounds: { id: AmbientSoundType; label: string; icon: string; desc: string }[] = [
     { id: 'off', label: t('focus.soundOff'), icon: '🔇', desc: t('focus.soundOffDesc') },
@@ -147,13 +196,124 @@ export const FocusTracker: React.FC<FocusTrackerProps> = ({
     } else {
       const selected = modes.find((m) => m.id === newMode);
       if (selected) {
-        const sec = selected.minutes * 60;
-        setDurationSeconds(sec);
-        setSecondsRemaining(sec);
-        setSecondsElapsed(0);
+        if (selected.minutes === 0 || selected.id === 'flowmodoro') {
+          setDurationSeconds(0);
+          setSecondsRemaining(0);
+          setSecondsElapsed(0);
+        } else {
+          const sec = selected.minutes * 60;
+          setDurationSeconds(sec);
+          setSecondsRemaining(sec);
+          setSecondsElapsed(0);
+        }
       }
     }
     soundEngine.playPop();
+  };
+
+  // Preset Management Handlers
+  const handleOpenAddPreset = () => {
+    soundEngine.playPop();
+    setEditingPreset(null);
+    setIsCreatingNewPreset(true);
+    setPresetFormLabel('');
+    setPresetFormMinutes(25);
+    setPresetFormIcon('🎯');
+    setPresetFormDesc('');
+    setPresetFormError(null);
+  };
+
+  const handleOpenEditPreset = (preset: FocusTimerPreset) => {
+    soundEngine.playPop();
+    setEditingPreset(preset);
+    setIsCreatingNewPreset(false);
+    setPresetFormLabel(preset.label);
+    setPresetFormMinutes(preset.minutes);
+    setPresetFormIcon(preset.icon || '⏱️');
+    setPresetFormDesc(preset.desc || '');
+    setPresetFormError(null);
+  };
+
+  const handleCancelPresetForm = () => {
+    soundEngine.playPop();
+    setEditingPreset(null);
+    setIsCreatingNewPreset(false);
+    setPresetFormError(null);
+  };
+
+  const handleSavePresetForm = () => {
+    const cleanLabel = presetFormLabel.trim();
+    if (!cleanLabel) {
+      setPresetFormError(language === 'fa' ? 'لطفاً نام پیش‌تنظیم را وارد کنید.' : 'Please enter a preset name.');
+      return;
+    }
+    const cleanMins = Math.max(0, Math.min(360, Number(presetFormMinutes) || 0));
+    const cleanIcon = presetFormIcon.trim() || '⏱️';
+    const cleanDesc = presetFormDesc.trim() || undefined;
+
+    let updatedList: FocusTimerPreset[];
+    if (isCreatingNewPreset) {
+      const newPreset: FocusTimerPreset = {
+        id: `preset_${Date.now()}`,
+        label: cleanLabel,
+        minutes: cleanMins,
+        icon: cleanIcon,
+        desc: cleanDesc,
+      };
+      updatedList = [...presetsList, newPreset];
+    } else if (editingPreset) {
+      updatedList = presetsList.map((p) =>
+        p.id === editingPreset.id
+          ? {
+              ...p,
+              label: cleanLabel,
+              minutes: cleanMins,
+              icon: cleanIcon,
+              desc: cleanDesc,
+            }
+          : p
+      );
+    } else {
+      return;
+    }
+
+    soundEngine.playGentleChime();
+    onUpdatePrefs({ customFocusPresets: updatedList });
+    setPresetSuccessMsg(language === 'fa' ? 'پیش‌تنظیم با موفقیت ذخیره شد!' : 'Preset saved successfully!');
+    setTimeout(() => setPresetSuccessMsg(null), 3000);
+    setEditingPreset(null);
+    setIsCreatingNewPreset(false);
+    setPresetFormError(null);
+  };
+
+  const handleDeletePreset = (presetId: string) => {
+    if (presetsList.length <= 1) {
+      setPresetFormError(language === 'fa' ? 'حداقل یک پیش‌تنظیم باید حفظ شود.' : 'At least one preset must be kept.');
+      return;
+    }
+    soundEngine.playPop();
+    const updatedList = presetsList.filter((p) => p.id !== presetId);
+    onUpdatePrefs({ customFocusPresets: updatedList });
+    if (mode === presetId) {
+      const fallback = updatedList[0];
+      handleSelectMode(fallback.id as FocusTimerMode);
+    }
+    setPresetSuccessMsg(language === 'fa' ? 'پیش‌تنظیم حذف شد.' : 'Preset removed.');
+    setTimeout(() => setPresetSuccessMsg(null), 3000);
+    if (editingPreset?.id === presetId) {
+      setEditingPreset(null);
+      setIsCreatingNewPreset(false);
+    }
+  };
+
+  const handleResetPresets = () => {
+    soundEngine.playPop();
+    onUpdatePrefs({ customFocusPresets: DEFAULT_FOCUS_PRESETS });
+    setPresetSuccessMsg(language === 'fa' ? 'پیش‌تنظیم‌ها به پیش‌فرض بازگشتند.' : 'Presets restored to defaults.');
+    setTimeout(() => setPresetSuccessMsg(null), 3000);
+    setEditingPreset(null);
+    setIsCreatingNewPreset(false);
+    setPresetFormError(null);
   };
 
   const handleCustomMinutesChange = (newMins: number) => {
@@ -352,9 +512,24 @@ export const FocusTracker: React.FC<FocusTrackerProps> = ({
           
           {/* Left Column (Desktop): Presets, Focus Modes & Custom Duration */}
           <div className="lg:col-span-6 space-y-4 flex flex-col justify-center order-2 lg:order-1">
-            <div className="flex items-center justify-between px-1">
-              <div className="text-[11px] font-bold text-[#485B44] dark:text-[#9EB598] uppercase tracking-wider">
-                {t('focus.presetsAndModes')}
+            <div className="flex items-center justify-between px-1 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-[#485B44] dark:text-[#9EB598] uppercase tracking-wider">
+                  {t('focus.presetsAndModes')}
+                </span>
+                <button
+                  type="button"
+                  id="btn-focus-manage-presets"
+                  onClick={() => {
+                    soundEngine.playPop();
+                    setShowPresetManagerModal(true);
+                  }}
+                  className="px-2.5 py-1 rounded-xl bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] dark:hover:bg-[#283A23] text-[#245209] dark:text-[#80D141] text-xs font-bold flex items-center gap-1.5 border border-[#DCEAD4] dark:border-[#263722] transition-colors cursor-pointer shadow-2xs active:scale-95"
+                  title={t('focus.managePresets', 'Manage Presets')}
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>{t('focus.managePresets', 'Manage Presets')}</span>
+                </button>
               </div>
               <div className="text-[11px] font-bold text-[#3B7E10] dark:text-[#80D141]">
                 {modes.find((m) => m.id === mode)?.desc || ''}
@@ -779,6 +954,349 @@ export const FocusTracker: React.FC<FocusTrackerProps> = ({
                   className="w-full py-2.5 rounded-full bg-[#80D141] hover:bg-[#72BF36] text-[#0F2600] font-bold text-xs shadow-md"
                 >
                   {t('focus.saveWin')}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Preset Manager Modal */}
+      <AnimatePresence>
+        {showPresetManagerModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="w-full max-w-lg bg-white dark:bg-[#182316] rounded-3xl p-5 sm:p-6 shadow-2xl border border-[#DCEAD4] dark:border-[#263722] max-h-[90vh] flex flex-col overflow-hidden"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-[#DCEAD4] dark:border-[#263722] shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1E4300] dark:text-[#80D141] flex items-center justify-center">
+                    <Sliders className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-[#151E14] dark:text-[#E8F2E4]">
+                      {t('focus.managePresets', 'Manage Presets')}
+                    </h3>
+                    <p className="text-xs text-[#485B44] dark:text-[#9EB598]">
+                      {language === 'fa'
+                        ? 'پیش‌تنظیم‌های زمان و حالت‌های تمرکز را ویرایش، اضافه یا حذف کنید'
+                        : 'Edit, add, or delete focus timer durations and modes'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEngine.playPop();
+                    setShowPresetManagerModal(false);
+                    setEditingPreset(null);
+                    setIsCreatingNewPreset(false);
+                    setPresetFormError(null);
+                  }}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-[#485B44] dark:text-[#9EB598] hover:bg-[#EDF6E8] dark:hover:bg-[#202E1E] transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Success / Info Message */}
+              {presetSuccessMsg && (
+                <div className="mt-3 p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-xs font-bold text-emerald-800 dark:text-emerald-200 flex items-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span>{presetSuccessMsg}</span>
+                </div>
+              )}
+
+              {/* Form Error Message */}
+              {presetFormError && (
+                <div className="mt-3 p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 text-xs font-bold text-rose-800 dark:text-rose-200 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                  <span>{presetFormError}</span>
+                </div>
+              )}
+
+              {/* Modal Body */}
+              <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
+                {/* Mode A: Creating New or Editing a Preset Form */}
+                {(isCreatingNewPreset || editingPreset) ? (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSavePresetForm();
+                    }}
+                    className="space-y-4 p-4 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26]"
+                  >
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-sm text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-2">
+                        {isCreatingNewPreset ? (
+                          <>
+                            <Plus className="w-4 h-4 text-[#80D141]" />
+                            <span>{t('focus.addPreset', 'Add Preset')}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Pencil className="w-4 h-4 text-[#80D141]" />
+                            <span>{t('focus.editPreset', 'Edit Preset')}</span>
+                          </>
+                        )}
+                      </h4>
+
+                      <button
+                        type="button"
+                        onClick={handleCancelPresetForm}
+                        className="text-xs text-[#485B44] dark:text-[#9EB598] hover:text-[#151E14] dark:hover:text-[#E8F2E4] underline cursor-pointer"
+                      >
+                        {language === 'fa' ? 'انصراف' : 'Cancel'}
+                      </button>
+                    </div>
+
+                    {/* Preset Name */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] mb-1">
+                        {t('focus.presetName', 'Preset Name')} *
+                      </label>
+                      <input
+                        type="text"
+                        value={presetFormLabel}
+                        onChange={(e) => setPresetFormLabel(e.target.value)}
+                        placeholder={t('focus.presetNamePlaceholder', 'e.g. Ultra Deep Work, Power Nap...')}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+                        required
+                        autoFocus
+                      />
+                    </div>
+
+                    {/* Duration in Minutes */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] mb-1">
+                        {t('focus.presetMinutes', 'Duration (Minutes, 0 for Flowmodoro)')} *
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={0}
+                          max={360}
+                          value={presetFormMinutes}
+                          onChange={(e) => setPresetFormMinutes(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                          className="w-28 px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141] font-mono text-center"
+                          required
+                        />
+                        <span className="text-xs text-[#485B44] dark:text-[#9EB598]">
+                          {presetFormMinutes === 0
+                            ? (language === 'fa' ? '🚀 شمارش رو به بالا (فلومودورو)' : '🚀 Count-up open flowmodoro')
+                            : (language === 'fa' ? `${toPersianDigits(presetFormMinutes)} دقیقه تایمر معکوس` : `${presetFormMinutes} mins countdown`)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                        <span className="text-[11px] text-[#485B44] dark:text-[#9EB598]">
+                          {language === 'fa' ? 'پیشنهادی:' : 'Quick set:'}
+                        </span>
+                        {[5, 15, 20, 25, 45, 60, 90, 0].map((mins) => (
+                          <button
+                            key={mins}
+                            type="button"
+                            onClick={() => {
+                              soundEngine.playPop();
+                              setPresetFormMinutes(mins);
+                            }}
+                            className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                              presetFormMinutes === mins
+                                ? 'bg-[#80D141] text-[#0F2600]'
+                                : 'bg-white dark:bg-[#22301F] text-[#485B44] dark:text-[#9EB598] hover:bg-[#E8F8D8]'
+                            }`}
+                          >
+                            {mins === 0 ? (language === 'fa' ? 'فلو' : 'Flow') : `${language === 'fa' ? toPersianDigits(mins) : mins}m`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Emoji Icon Picker */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] mb-1">
+                        {t('focus.presetIcon', 'Emoji Icon')}
+                      </label>
+                      <div className="flex items-center gap-2 mb-2">
+                        <input
+                          type="text"
+                          value={presetFormIcon}
+                          onChange={(e) => setPresetFormIcon(e.target.value)}
+                          maxLength={4}
+                          className="w-14 h-10 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-lg text-center focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+                        />
+                        <span className="text-[11px] text-[#485B44] dark:text-[#9EB598]">
+                          {language === 'fa' ? 'یا یکی از این موارد را انتخاب کنید:' : 'or click a suggestion:'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {['⚡', '🎯', '🍅', '🌊', '🚀', '⏱️', '🧘', '☕', '💡', '🔥', '🏆', '🧠', '📚', '💻', '🌿', '✨'].map((emoji) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => {
+                              soundEngine.playPop();
+                              setPresetFormIcon(emoji);
+                            }}
+                            className={`w-8 h-8 rounded-xl text-base flex items-center justify-center transition-all cursor-pointer ${
+                              presetFormIcon === emoji
+                                ? 'bg-[#80D141] scale-110 shadow-xs'
+                                : 'bg-white dark:bg-[#22301F] hover:bg-[#E8F8D8] dark:hover:bg-[#2A3E26]'
+                            }`}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] mb-1">
+                        {t('focus.presetDesc', 'Description (Optional)')}
+                      </label>
+                      <input
+                        type="text"
+                        value={presetFormDesc}
+                        onChange={(e) => setPresetFormDesc(e.target.value)}
+                        placeholder={t('focus.presetDescPlaceholder', 'e.g. 60 min sustained deep flow')}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+                      />
+                    </div>
+
+                    {/* Form Action Buttons */}
+                    <div className="flex items-center justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={handleCancelPresetForm}
+                        className="px-4 py-2 rounded-xl text-xs font-bold text-[#485B44] dark:text-[#9EB598] hover:bg-[#EDF6E8] dark:hover:bg-[#253522] transition-colors cursor-pointer"
+                      >
+                        {language === 'fa' ? 'انصراف' : 'Cancel'}
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-5 py-2 rounded-xl bg-[#80D141] hover:bg-[#72BF36] text-[#0F2600] text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                        <span>{language === 'fa' ? 'ذخیره پیش‌تنظیم' : 'Save Preset'}</span>
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  /* Mode B: Presets List with Add and Reset actions */
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        id="btn-add-new-preset"
+                        onClick={handleOpenAddPreset}
+                        className="px-3.5 py-2 rounded-xl bg-[#80D141] hover:bg-[#72BF36] text-[#0F2600] text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                        <span>{t('focus.addPreset', 'Add Preset')}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleResetPresets}
+                        className="px-3 py-2 rounded-xl bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] dark:hover:bg-[#283A23] text-[#245209] dark:text-[#80D141] text-xs font-bold border border-[#DCEAD4] dark:border-[#263722] flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title={t('focus.resetPresets', 'Reset to Defaults')}
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>{t('focus.resetPresets', 'Reset to Defaults')}</span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-2 pt-1">
+                      {presetsList.map((preset, idx) => {
+                        const isCurrentActive = mode === preset.id;
+                        return (
+                          <div
+                            key={preset.id || idx}
+                            className={`p-3 sm:p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                              isCurrentActive
+                                ? 'bg-[#80D141]/10 dark:bg-[#80D141]/15 border-[#80D141]'
+                                : 'bg-[#F7FAF4] dark:bg-[#1C2919] border-[#DCEAD4] dark:border-[#2A3E26]'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <span className="w-10 h-10 rounded-xl bg-white dark:bg-[#263722] border border-[#DCEAD4] dark:border-[#33482E] flex items-center justify-center text-xl shrink-0 shadow-xs">
+                                {preset.icon || '⏱️'}
+                              </span>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <h4 className="font-bold text-sm text-[#151E14] dark:text-[#E8F2E4] truncate">
+                                    {preset.label}
+                                  </h4>
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#EDF6E8] dark:bg-[#233520] text-[#3B7E10] dark:text-[#80D141] border border-[#D0E2C8] dark:border-[#2E432A]">
+                                    {preset.minutes === 0
+                                      ? (language === 'fa' ? 'فلومودورو' : 'Flowmodoro')
+                                      : `${language === 'fa' ? toPersianDigits(preset.minutes) : preset.minutes} ${t('focus.minsUnit')}`}
+                                  </span>
+                                  {isCurrentActive && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#80D141] text-[#0F2600]">
+                                      {language === 'fa' ? 'انتخاب‌شده' : 'Active'}
+                                    </span>
+                                  )}
+                                </div>
+                                {preset.desc && (
+                                  <p className="text-[11px] text-[#485B44] dark:text-[#9EB598] truncate mt-0.5">
+                                    {preset.desc}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditPreset(preset)}
+                                className="p-2 rounded-xl bg-white dark:bg-[#263722] hover:bg-[#E8F8D8] dark:hover:bg-[#2E4229] text-[#485B44] dark:text-[#9EB598] hover:text-[#151E14] dark:hover:text-[#E8F2E4] border border-[#DCEAD4] dark:border-[#33482E] transition-all cursor-pointer shadow-2xs"
+                                title={t('focus.editPreset', 'Edit Preset')}
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeletePreset(preset.id)}
+                                disabled={presetsList.length <= 1}
+                                className="p-2 rounded-xl bg-white dark:bg-[#263722] hover:bg-rose-50 dark:hover:bg-rose-950/40 text-[#485B44] dark:text-[#9EB598] hover:text-rose-600 dark:hover:text-rose-400 border border-[#DCEAD4] dark:border-[#33482E] disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs"
+                                title={t('focus.deletePreset', 'Delete Preset')}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="pt-3 border-t border-[#DCEAD4] dark:border-[#263722] flex items-center justify-between text-xs text-[#485B44] dark:text-[#9EB598] shrink-0">
+                <span>
+                  {language === 'fa'
+                    ? `${toPersianDigits(presetsList.length)} پیش‌تنظیم موجود`
+                    : `${presetsList.length} presets configured`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundEngine.playPop();
+                    setShowPresetManagerModal(false);
+                    setEditingPreset(null);
+                    setIsCreatingNewPreset(false);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] text-[#245209] dark:text-[#80D141] font-bold transition-colors cursor-pointer"
+                >
+                  {language === 'fa' ? 'بستن' : 'Done'}
                 </button>
               </div>
             </motion.div>
