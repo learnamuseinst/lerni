@@ -26,7 +26,8 @@ import {
   ActiveReminderAlert,
   syncRemindersWithServiceWorker,
   stopStrongReminderInSW,
-  notifyServiceWorkerUserEntered 
+  notifyServiceWorkerUserEntered,
+  initBackgroundHeartbeat
 } from './utils/reminderManager';
 import { ReminderToastBanner } from './components/common/ReminderToastBanner';
 import { OfflineIndicator } from './components/OfflineIndicator';
@@ -136,6 +137,8 @@ export default function App() {
 
     checkReminders();
     const intervalId = setInterval(checkReminders, 12000);
+    // Unthrottled Web Worker heartbeat for background/inactive tabs
+    const cleanupHeartbeat = initBackgroundHeartbeat(checkReminders);
 
     const handleFocus = () => {
       notifyServiceWorkerUserEntered();
@@ -145,16 +148,19 @@ export default function App() {
 
     return () => {
       clearInterval(intervalId);
+      cleanupHeartbeat();
       window.removeEventListener('focus', handleFocus);
     };
   }, [bujoEntries, habits, prefs]);
 
   const handleDismissAlert = (alertId: string) => {
+    soundEngine.stopStrongAlarmLoop(alertId);
     stopStrongReminderInSW(alertId);
     setActiveAlerts((prev) => prev.filter((a) => a.id !== alertId));
   };
 
   const handleSnoozeAlert = (alert: ActiveReminderAlert, minutes: number = 5) => {
+    soundEngine.stopStrongAlarmLoop(alert.id);
     stopStrongReminderInSW(alert.id);
     setActiveAlerts((prev) => prev.filter((a) => a.id !== alert.id));
 
@@ -168,7 +174,7 @@ export default function App() {
       };
       if (prefs.reminderSoundEnabled !== false && prefs.soundEffectsEnabled !== false) {
         if (snoozedAlert.intensity === 'strong') {
-          soundEngine.playStrongAlarmPulse();
+          soundEngine.startStrongAlarmLoop(snoozedAlert.id);
         } else {
           soundEngine.playGentleChime();
         }
@@ -178,6 +184,7 @@ export default function App() {
   };
 
   const handleCompleteItemFromReminder = (entryId: string, entryType: 'task' | 'event' | 'habit') => {
+    soundEngine.stopStrongAlarmLoop(entryId);
     stopStrongReminderInSW(entryId);
     if (entryType === 'task' || entryType === 'event') {
       const updated = bujoEntries.map((e) =>

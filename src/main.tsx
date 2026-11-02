@@ -3,29 +3,16 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
-// Manage Service Worker: Only register in production; unregister and clear in development
+// Register Service Worker for offline PWA features and background reminder notifications
 if ('serviceWorker' in navigator) {
-  if (import.meta.env.PROD) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch((err) => {
-        console.warn('Lerni PWA Service Worker registration failed:', err);
-      });
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').then((registration) => {
+      // Periodically check for updates
+      registration.update().catch(() => {});
+    }).catch((err) => {
+      console.warn('Lerni Service Worker registration failed:', err);
     });
-  } else {
-    // Unregister any active service workers in development mode to prevent stale module caching
-    navigator.serviceWorker.getRegistrations().then((registrations) => {
-      for (const reg of registrations) {
-        reg.unregister();
-      }
-    });
-    if ('caches' in window) {
-      caches.keys().then((keys) => {
-        for (const key of keys) {
-          caches.delete(key);
-        }
-      });
-    }
-  }
+  });
 }
 
 createRoot(document.getElementById('root')!).render(

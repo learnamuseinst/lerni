@@ -7,6 +7,8 @@ class SoundEngine {
   private currentType: AmbientSoundType = 'off';
   private volume: number = 0.5;
   private effectsEnabled: boolean = true;
+  private strongAlarmInterval: any = null;
+  private activeStrongAlarmIds: Set<string> = new Set();
 
   public setEffectsEnabled(enabled: boolean) {
     this.effectsEnabled = enabled;
@@ -292,32 +294,90 @@ class SoundEngine {
       this.initContext();
       if (!this.ctx) return;
       const now = this.ctx.currentTime;
-      // Urgent, clear dual-pulse beacon: 880Hz (A5) -> 1046.5Hz (C6) -> 880Hz (A5)
-      const pulses = [
-        { freq: 880, delay: 0 },
-        { freq: 1046.5, delay: 0.12 },
-        { freq: 880, delay: 0.24 },
+
+      // Haptic vibration pulse if supported
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try {
+          navigator.vibrate([400, 120, 400, 120, 400]);
+        } catch {}
+      }
+
+      // Assertive, impossible-to-miss emergency beacon pattern:
+      // High-low-high-low dual-frequency siren bursts with harmonic overtones
+      const toneBursts = [
+        { freq1: 880, freq2: 1760, delay: 0.00, dur: 0.14 },
+        { freq1: 1174, freq2: 2348, delay: 0.16, dur: 0.14 },
+        { freq1: 880, freq2: 1760, delay: 0.32, dur: 0.14 },
+        { freq1: 1174, freq2: 2348, delay: 0.48, dur: 0.22 },
       ];
-      pulses.forEach(({ freq, delay }) => {
-        const osc = this.ctx!.createOscillator();
+
+      toneBursts.forEach(({ freq1, freq2, delay, dur }) => {
+        const oscPrimary = this.ctx!.createOscillator();
+        const oscHarmonic = this.ctx!.createOscillator();
         const noteGain = this.ctx!.createGain();
 
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, now + delay);
+        oscPrimary.type = 'sawtooth';
+        oscHarmonic.type = 'sine';
+
+        oscPrimary.frequency.setValueAtTime(freq1, now + delay);
+        oscHarmonic.frequency.setValueAtTime(freq2, now + delay);
 
         noteGain.gain.setValueAtTime(0.001, now + delay);
-        noteGain.gain.exponentialRampToValueAtTime(0.3, now + delay + 0.02);
-        noteGain.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.28);
+        noteGain.gain.exponentialRampToValueAtTime(0.35, now + delay + 0.015);
+        noteGain.gain.exponentialRampToValueAtTime(0.0001, now + delay + dur);
 
-        osc.connect(noteGain);
+        oscPrimary.connect(noteGain);
+        oscHarmonic.connect(noteGain);
         noteGain.connect(this.ctx!.destination);
 
-        osc.start(now + delay);
-        osc.stop(now + delay + 0.3);
+        oscPrimary.start(now + delay);
+        oscHarmonic.start(now + delay);
+        oscPrimary.stop(now + delay + dur + 0.02);
+        oscHarmonic.stop(now + delay + dur + 0.02);
       });
     } catch (e) {
       console.warn("Strong alarm audio error:", e);
     }
+  }
+
+  /**
+   * Starts a repeating alarm loop that pulses every 3 seconds until stopped
+   */
+  public startStrongAlarmLoop(alertId?: string) {
+    if (alertId) {
+      this.activeStrongAlarmIds.add(alertId);
+    }
+    // Play first burst immediately
+    this.playStrongAlarmPulse();
+
+    if (!this.strongAlarmInterval) {
+      this.strongAlarmInterval = setInterval(() => {
+        this.playStrongAlarmPulse();
+      }, 3000);
+    }
+  }
+
+  /**
+   * Stops repeating for a specific alert or all alerts if no IDs remain
+   */
+  public stopStrongAlarmLoop(alertId?: string) {
+    if (alertId) {
+      this.activeStrongAlarmIds.delete(alertId);
+    }
+    if (!alertId || this.activeStrongAlarmIds.size === 0) {
+      this.stopAllStrongAlarms();
+    }
+  }
+
+  /**
+   * Stops all active repeating strong alarms immediately
+   */
+  public stopAllStrongAlarms() {
+    if (this.strongAlarmInterval) {
+      clearInterval(this.strongAlarmInterval);
+      this.strongAlarmInterval = null;
+    }
+    this.activeStrongAlarmIds.clear();
   }
 }
 

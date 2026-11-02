@@ -405,17 +405,26 @@ async function scheduleNextAlarmInSW() {
   // If modern Notification Triggers API (Chromium showTrigger) is supported, register it natively!
   try {
     if ('showTrigger' in Notification.prototype && typeof TimestampTrigger !== 'undefined') {
-      const isFa = Boolean(nextEarliest.isFa);
-      const isStrong = nextEarliest.intensity === 'strong';
-      const titlePrefix = isStrong ? '🚨 [STRONG / شدید] ' : '🔔 ';
-      const title = `${titlePrefix}${nextEarliest.title}`;
-      self.registration.showNotification(title, {
-        body: nextEarliest.label || '',
-        icon: '/icon.svg',
-        tag: `lerni-rem-${nextEarliest.id}`,
-        showTrigger: new TimestampTrigger(nextEarliest.triggerTimeMs),
-        data: nextEarliest,
-      });
+      for (const item of futureReminders) {
+        if (item.triggerTimeMs > nowMs) {
+          const isFa = Boolean(item.isFa);
+          const isStrong = item.intensity === 'strong';
+          const titlePrefix = isStrong ? '🚨 [STRONG / شدید] ' : '🔔 ';
+          const title = `${titlePrefix}${item.entryType === 'event' ? (isFa ? 'رویداد' : 'Event') : item.entryType === 'habit' ? (isFa ? 'عادت' : 'Habit') : (isFa ? 'وظیفه' : 'Task')}: ${item.title}`;
+          self.registration.showNotification(title, {
+            body: `${item.label || ''}${item.time ? ` · ${item.time}` : ''}${isStrong ? (isFa ? ' — تکرار مداوم هر ۳ ثانیه تا زمان باز شدن برنامه' : ' — Repeating every 3s until app is opened') : ''}`,
+            icon: '/icon.svg',
+            badge: '/icon.svg',
+            tag: `lerni-rem-${item.id}`,
+            showTrigger: new TimestampTrigger(item.triggerTimeMs),
+            data: item,
+            actions: [
+              { action: 'dismiss', title: isFa ? 'رد کردن' : 'Dismiss' },
+              { action: 'snooze', title: isFa ? 'تعویق ۵ د' : 'Snooze 5m' },
+            ],
+          }).catch(() => {});
+        }
+      }
     }
   } catch (e) {
     // TimestampTrigger not supported in this browser version; fallback to setTimeout
@@ -430,11 +439,24 @@ async function scheduleNextAlarmInSW() {
   }
 }
 
+// Background sync events for browser wake-up
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag === 'check-reminders') {
+    event.waitUntil(checkDueRemindersInSW());
+  }
+});
+
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'check-reminders' || event.tag === 'sync-reminders') {
+    event.waitUntil(checkDueRemindersInSW());
+  }
+});
+
 // Service Worker Message Listener
 self.addEventListener('message', (event) => {
   if (!event.data || !event.data.type) return;
 
-  const { type, reminders, id } = event.data;
+  const { type, reminders, id, title, body, data } = event.data;
 
   if (type === 'SYNC_SCHEDULED_REMINDERS' && Array.isArray(reminders)) {
     event.waitUntil(
@@ -443,6 +465,47 @@ self.addEventListener('message', (event) => {
         await scheduleNextAlarmInSW();
       })()
     );
+  } else if (type === 'START_STRONG_REMINDER') {
+    if (id) {
+      stopStrongAlarmInSW(id);
+      const isFa = Boolean(data?.isFa);
+      const tag = `lerni-rem-${id}`;
+      const notificationOptions = {
+        body: body || 'Strong Reminder',
+        icon: '/icon.svg',
+        badge: '/icon.svg',
+        tag,
+        renotify: true,
+        requireInteraction: true,
+        vibrate: [400, 150, 400, 150, 400],
+        data: { id, intensity: 'strong', ...data, url: '/' },
+        actions: [
+          { action: 'dismiss', title: isFa ? 'رد کردن' : 'Dismiss' },
+          { action: 'snooze', title: isFa ? 'تعویق ۵ د' : 'Snooze 5m' },
+        ],
+      };
+
+      self.registration.showNotification(title || '🚨 Strong Reminder', notificationOptions).catch(() => {});
+
+      let repeatCount = 0;
+      const intervalId = setInterval(async () => {
+        repeatCount++;
+        if (repeatCount > 300 || !activeStrongAlarms.has(id)) {
+          clearInterval(intervalId);
+          activeStrongAlarms.delete(id);
+          return;
+        }
+        try {
+          await self.registration.showNotification(title || '🚨 Strong Reminder', {
+            ...notificationOptions,
+            tag,
+            renotify: true,
+          });
+        } catch (err) {}
+      }, 3000);
+
+      activeStrongAlarms.set(id, { intervalId, repeatCount });
+    }
   } else if (type === 'STOP_STRONG_REMINDER') {
     if (id) {
       stopStrongAlarmInSW(id);

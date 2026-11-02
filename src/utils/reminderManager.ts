@@ -158,12 +158,13 @@ export async function sendTestReminderNotification(
   const isStrong = intensity === 'strong';
 
   if (isStrong) {
-    soundEngine.playStrongAlarmPulse();
+    soundEngine.startStrongAlarmLoop('lerni-test-strong');
     const title = isFa ? '🚨 لرنی — یادآور آزمایشی شدید (Strong)' : '🚨 Lerni — Test Strong Reminder';
     const body = isFa
       ? 'یادآور شدید لرنی: تکرار اعلان هر ۳ ثانیه تا زمان باز شدن برنامه و رد یا تعویق!'
       : 'Lerni Strong Reminder: Repeated alert every 3s until opened and dismissed/snoozed!';
-    return dispatchBrowserNotification(title, body, 'lerni-test-strong', 'strong', { isTest: true });
+    startStrongReminderInSW('lerni-test-strong', title, body, { isTest: true, isFa });
+    return dispatchBrowserNotification(title, body, 'lerni-test-strong', 'strong', { isTest: true, isFa });
   }
 
   soundEngine.playGentleChime();
@@ -171,7 +172,7 @@ export async function sendTestReminderNotification(
   const body = isFa
     ? 'سیستم یادآورها و اعلان‌های لرنی به درستی فعال است!'
     : 'Lerni reminders & notifications are active and ready!';
-  return dispatchBrowserNotification(title, body, 'lerni-test-normal', 'normal', { isTest: true });
+  return dispatchBrowserNotification(title, body, 'lerni-test-normal', 'normal', { isTest: true, isFa });
 }
 
 // -------------------------------------------------------------
@@ -330,7 +331,36 @@ export async function syncRemindersWithServiceWorker(
   }
 }
 
+export function startStrongReminderInSW(
+  alertId: string,
+  title: string,
+  body: string,
+  data?: any
+): void {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+  try {
+    const payload = {
+      type: 'START_STRONG_REMINDER',
+      id: alertId,
+      title,
+      body,
+      data: { id: alertId, intensity: 'strong', ...data },
+    };
+    if (navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage(payload);
+    } else {
+      navigator.serviceWorker.ready
+        .then((reg) => {
+          reg.active?.postMessage(payload);
+        })
+        .catch(() => {});
+    }
+  } catch {}
+}
+
 export function stopStrongReminderInSW(alertId: string): void {
+  // Always stop client audio loop as well
+  soundEngine.stopStrongAlarmLoop(alertId);
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
   try {
     navigator.serviceWorker.controller?.postMessage({
@@ -341,12 +371,68 @@ export function stopStrongReminderInSW(alertId: string): void {
 }
 
 export function notifyServiceWorkerUserEntered(): void {
+  // Silence all active client strong alarms
+  soundEngine.stopAllStrongAlarms();
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
   try {
     navigator.serviceWorker.controller?.postMessage({
       type: 'CLIENT_ENTERED_APP',
     });
   } catch {}
+}
+
+// -------------------------------------------------------------
+// Unthrottled Web Worker Background Heartbeat
+// Bypasses browser timer throttling when tab is hidden or backgrounded
+// -------------------------------------------------------------
+let backgroundHeartbeatWorker: Worker | null = null;
+let heartbeatTickCallback: (() => void) | null = null;
+
+export function initBackgroundHeartbeat(onTick: () => void): () => void {
+  heartbeatTickCallback = onTick;
+
+  if (typeof window === 'undefined') return () => {};
+
+  if (!backgroundHeartbeatWorker) {
+    try {
+      const code = `
+        let timer = null;
+        self.onmessage = function(e) {
+          if (e.data === 'start') {
+            if (timer) clearInterval(timer);
+            timer = setInterval(function() {
+              self.postMessage('tick');
+            }, 1000);
+          } else if (e.data === 'stop') {
+            if (timer) clearInterval(timer);
+            timer = null;
+          }
+        };
+      `;
+      const blob = new Blob([code], { type: 'application/javascript' });
+      const workerUrl = URL.createObjectURL(blob);
+      backgroundHeartbeatWorker = new Worker(workerUrl);
+      backgroundHeartbeatWorker.onmessage = () => {
+        if (heartbeatTickCallback) {
+          heartbeatTickCallback();
+        }
+      };
+      backgroundHeartbeatWorker.postMessage('start');
+    } catch (e) {
+      console.warn('Background heartbeat Web Worker not available, fallback to standard timer:', e);
+    }
+  }
+
+  return () => {
+    heartbeatTickCallback = null;
+    if (backgroundHeartbeatWorker) {
+      try {
+        backgroundHeartbeatWorker.postMessage('stop');
+        backgroundHeartbeatWorker.terminate();
+      } catch {}
+      backgroundHeartbeatWorker = null;
+    }
+  };
 }
 
 const FIRED_STORAGE_KEY = 'lerni_fired_reminders_v2';
@@ -494,7 +580,7 @@ export function checkAndTriggerDueReminders(
         // Sound alert
         if (prefs.reminderSoundEnabled !== false && prefs.soundEffectsEnabled !== false) {
           if (intensity === 'strong') {
-            soundEngine.playStrongAlarmPulse();
+            soundEngine.startStrongAlarmLoop(firedKey);
           } else {
             soundEngine.playGentleChime();
           }
@@ -507,11 +593,21 @@ export function checkAndTriggerDueReminders(
           const notifBody = `${timingLabel}${entry.time ? ` · ${entry.time}` : ''}${
             intensity === 'strong' ? (isFa ? ' — تکرار مداوم هر ۳ ثانیه' : ' — Repeating every 3s') : ''
           }`;
+          if (intensity === 'strong') {
+            startStrongReminderInSW(firedKey, notifTitle, notifBody, {
+              id: firedKey,
+              reminderId: reminder.id,
+              entryId: entry.id,
+              entryType: entry.type,
+              isFa,
+            });
+          }
           dispatchBrowserNotification(notifTitle, notifBody, firedKey, intensity, {
             id: firedKey,
             reminderId: reminder.id,
             entryId: entry.id,
             entryType: entry.type,
+            isFa,
           });
         }
       }
@@ -570,7 +666,7 @@ export function checkAndTriggerDueReminders(
 
         if (prefs.reminderSoundEnabled !== false && prefs.soundEffectsEnabled !== false) {
           if (intensity === 'strong') {
-            soundEngine.playStrongAlarmPulse();
+            soundEngine.startStrongAlarmLoop(firedKey);
           } else {
             soundEngine.playGentleChime();
           }
@@ -582,11 +678,21 @@ export function checkAndTriggerDueReminders(
           const notifBody = `${timingLabel}${habit.time ? ` · ${habit.time}` : ''}${
             intensity === 'strong' ? (isFa ? ' — تکرار مداوم هر ۳ ثانیه' : ' — Repeating every 3s') : ''
           }`;
+          if (intensity === 'strong') {
+            startStrongReminderInSW(firedKey, notifTitle, notifBody, {
+              id: firedKey,
+              reminderId: reminder.id,
+              entryId: habit.id,
+              entryType: 'habit',
+              isFa,
+            });
+          }
           dispatchBrowserNotification(notifTitle, notifBody, firedKey, intensity, {
             id: firedKey,
             reminderId: reminder.id,
             entryId: habit.id,
             entryType: 'habit',
+            isFa,
           });
         }
       }

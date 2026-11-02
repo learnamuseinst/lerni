@@ -21,18 +21,22 @@ export const ReminderToastBanner: React.FC<ReminderToastBannerProps> = ({
   const { t, language } = useI18n();
   const isFa = language === 'fa';
 
-  // For Strong reminders: play audio pulse every 3 seconds until dismissed or snoozed
+  // For Strong reminders: play siren sound & loop every 3 seconds until dismissed or snoozed
   useEffect(() => {
-    const hasStrong = alerts.some((a) => a.intensity === 'strong');
-    if (!hasStrong) return;
+    const strongAlerts = alerts.filter((a) => a.intensity === 'strong');
+    if (strongAlerts.length === 0) {
+      soundEngine.stopAllStrongAlarms();
+      return;
+    }
 
-    soundEngine.playStrongAlarmPulse();
+    strongAlerts.forEach((a) => {
+      soundEngine.startStrongAlarmLoop(a.id);
+    });
 
-    const interval = setInterval(() => {
-      soundEngine.playStrongAlarmPulse();
-    }, 3000);
-
-    return () => clearInterval(interval);
+    return () => {
+      // Cleanup when toast unmounts
+      soundEngine.stopAllStrongAlarms();
+    };
   }, [alerts]);
 
   if (!alerts || alerts.length === 0) return null;

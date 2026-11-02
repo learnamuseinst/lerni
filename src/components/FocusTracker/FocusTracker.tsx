@@ -22,7 +22,9 @@ import {
   Trash2,
   X,
   Check,
-  AlertCircle
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight
 } from 'lucide-react';
 import { FocusTimerMode, FocusSession, AmbientSoundType, UserPreferences, FocusTab, DEFAULT_FOCUS_TAB_ORDER, FocusTimerPreset, DEFAULT_FOCUS_PRESETS } from '../../types';
 import { getTodayDateString } from '../../utils/storage';
@@ -83,6 +85,14 @@ export const FocusTracker: React.FC<FocusTrackerProps> = ({
   const [presetFormDesc, setPresetFormDesc] = useState('');
   const [presetFormError, setPresetFormError] = useState<string | null>(null);
   const [presetSuccessMsg, setPresetSuccessMsg] = useState<string | null>(null);
+
+  // Dispatch modal state change when preset manager full screen view opens/closes
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('app:modal-state-change', { detail: { isOpen: showPresetManagerModal } }));
+    return () => {
+      window.dispatchEvent(new CustomEvent('app:modal-state-change', { detail: { isOpen: false } }));
+    };
+  }, [showPresetManagerModal]);
 
   const [mode, setMode] = useState<FocusTimerMode>(() => {
     return presetsList[0]?.id || 'sprint_5';
@@ -961,33 +971,77 @@ export const FocusTracker: React.FC<FocusTrackerProps> = ({
         )}
       </AnimatePresence>
 
-      {/* Preset Manager Modal */}
+      {/* Preset Manager Full-Screen View */}
       <AnimatePresence>
         {showPresetManagerModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              className="w-full max-w-lg bg-white dark:bg-[#182316] rounded-3xl p-5 sm:p-6 shadow-2xl border border-[#DCEAD4] dark:border-[#263722] max-h-[90vh] flex flex-col overflow-hidden"
-            >
-              {/* Modal Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-[#DCEAD4] dark:border-[#263722] shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1E4300] dark:text-[#80D141] flex items-center justify-center">
-                    <Sliders className="w-4 h-4" />
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            className="fixed inset-0 z-50 bg-[#F4F8F1] dark:bg-[#0E170C] flex flex-col overflow-hidden"
+          >
+            {/* Top Navigation Bar */}
+            <header className="h-16 sm:h-20 bg-white/95 dark:bg-[#152014]/95 backdrop-blur-md border-b border-[#DCEAD4] dark:border-[#263722] px-4 sm:px-8 flex items-center justify-between shrink-0 shadow-xs z-10">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <button
+                  type="button"
+                  id="btn-back-to-focus-timer"
+                  onClick={() => {
+                    soundEngine.playPop();
+                    setShowPresetManagerModal(false);
+                    setEditingPreset(null);
+                    setIsCreatingNewPreset(false);
+                    setPresetFormError(null);
+                  }}
+                  className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-2xl bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#DDF4CD] dark:hover:bg-[#283A23] text-[#245209] dark:text-[#80D141] font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-xs active:scale-95"
+                >
+                  {language === 'fa' ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
+                  <span>{language === 'fa' ? 'بازگشت به تایمر تمرکز' : 'Back to Focus Timer'}</span>
+                </button>
+
+                <div className="hidden md:flex items-center gap-2.5 border-l rtl:border-l-0 rtl:border-r border-[#DCEAD4] dark:border-[#263722] pl-3.5 rtl:pl-0 rtl:pr-3.5">
+                  <div className="w-9 h-9 rounded-2xl bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1E4300] dark:text-[#80D141] flex items-center justify-center shadow-xs">
+                    <Sliders className="w-4.5 h-4.5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-base text-[#151E14] dark:text-[#E8F2E4]">
-                      {t('focus.managePresets', 'Manage Presets')}
-                    </h3>
-                    <p className="text-xs text-[#485B44] dark:text-[#9EB598]">
+                    <h2 className="text-base font-bold text-[#151E14] dark:text-[#E8F2E4] font-display">
+                      {t('focus.managePresets', 'Focus Timer Presets')}
+                    </h2>
+                    <p className="text-[11px] text-[#485B44] dark:text-[#9EB598]">
                       {language === 'fa'
-                        ? 'پیش‌تنظیم‌های زمان و حالت‌های تمرکز را ویرایش، اضافه یا حذف کنید'
-                        : 'Edit, add, or delete focus timer durations and modes'}
+                        ? 'شخصی‌سازی زمان‌ها، نمادها و حالت‌های تمرکز'
+                        : 'Customize timer durations, emoji icons, and focus modes'}
                     </p>
                   </div>
                 </div>
+              </div>
+
+              {/* Header Right Actions */}
+              <div className="flex items-center gap-2">
+                {!isCreatingNewPreset && !editingPreset && (
+                  <>
+                    <button
+                      type="button"
+                      id="btn-add-new-preset-header"
+                      onClick={handleOpenAddPreset}
+                      className="px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-[#80D141] hover:bg-[#72BF36] text-[#0F2600] text-xs sm:text-sm font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                    >
+                      <Plus className="w-4 h-4 stroke-[2.5]" />
+                      <span>{t('focus.addPreset', 'Add Preset')}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleResetPresets}
+                      className="hidden sm:flex px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] dark:hover:bg-[#283A23] text-[#245209] dark:text-[#80D141] text-xs sm:text-sm font-bold border border-[#DCEAD4] dark:border-[#263722] items-center gap-1.5 transition-colors cursor-pointer shadow-xs active:scale-95"
+                      title={t('focus.resetPresets', 'Reset to Defaults')}
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>{t('focus.resetPresets', 'Reset Defaults')}</span>
+                    </button>
+                  </>
+                )}
 
                 <button
                   type="button"
@@ -998,278 +1052,392 @@ export const FocusTracker: React.FC<FocusTrackerProps> = ({
                     setIsCreatingNewPreset(false);
                     setPresetFormError(null);
                   }}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-[#485B44] dark:text-[#9EB598] hover:bg-[#EDF6E8] dark:hover:bg-[#202E1E] transition-colors cursor-pointer"
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center text-[#485B44] dark:text-[#9EB598] hover:bg-[#EDF6E8] dark:hover:bg-[#202E1E] transition-colors cursor-pointer"
+                  aria-label="Close"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
+            </header>
 
-              {/* Success / Info Message */}
-              {presetSuccessMsg && (
-                <div className="mt-3 p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-xs font-bold text-emerald-800 dark:text-emerald-200 flex items-center gap-2">
-                  <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <span>{presetSuccessMsg}</span>
-                </div>
-              )}
+            {/* Scrollable Full-Screen Content */}
+            <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6">
+              <div className="max-w-5xl mx-auto space-y-6">
 
-              {/* Form Error Message */}
-              {presetFormError && (
-                <div className="mt-3 p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 text-xs font-bold text-rose-800 dark:text-rose-200 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
-                  <span>{presetFormError}</span>
-                </div>
-              )}
+                {/* Success feedback toast */}
+                <AnimatePresence>
+                  {presetSuccessMsg && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-sm font-bold text-emerald-800 dark:text-emerald-200 flex items-center gap-2.5 shadow-sm"
+                    >
+                      <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <span>{presetSuccessMsg}</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
-              {/* Modal Body */}
-              <div className="flex-1 overflow-y-auto py-4 space-y-4 pr-1">
-                {/* Mode A: Creating New or Editing a Preset Form */}
+                {/* Error feedback toast */}
+                <AnimatePresence>
+                  {presetFormError && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 text-sm font-bold text-rose-800 dark:text-rose-200 flex items-center gap-2.5 shadow-sm"
+                    >
+                      <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                      <span>{presetFormError}</span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* View 1: Form View when Creating or Editing */}
                 {(isCreatingNewPreset || editingPreset) ? (
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
                       handleSavePresetForm();
                     }}
-                    className="space-y-4 p-4 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26]"
+                    className="bg-white dark:bg-[#182316] rounded-3xl p-5 sm:p-8 shadow-sm border border-[#DCEAD4] dark:border-[#263722] space-y-6"
                   >
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-sm text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-2">
-                        {isCreatingNewPreset ? (
-                          <>
-                            <Plus className="w-4 h-4 text-[#80D141]" />
-                            <span>{t('focus.addPreset', 'Add Preset')}</span>
-                          </>
-                        ) : (
-                          <>
-                            <Pencil className="w-4 h-4 text-[#80D141]" />
-                            <span>{t('focus.editPreset', 'Edit Preset')}</span>
-                          </>
-                        )}
-                      </h4>
+                    <div className="flex items-center justify-between pb-4 border-b border-[#DCEAD4] dark:border-[#263722]">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-[#E8F8D8] dark:bg-[#1E3800] text-[#1E4300] dark:text-[#80D141] flex items-center justify-center text-lg">
+                          {presetFormIcon || '⏱️'}
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-base sm:text-lg text-[#151E14] dark:text-[#E8F2E4] font-display">
+                            {isCreatingNewPreset
+                              ? (language === 'fa' ? 'ایجاد پیش‌تنظیم جدید' : 'Create New Focus Preset')
+                              : (language === 'fa' ? `ویرایش پیش‌تنظیم: ${presetFormLabel || ''}` : `Edit Preset: ${presetFormLabel || ''}`)}
+                          </h3>
+                          <p className="text-xs text-[#485B44] dark:text-[#9EB598]">
+                            {language === 'fa'
+                              ? 'تنظیمات زمان و نام پیش‌تنظیم را وارد کرده و پیش‌نمایش آن را در سمت راست مشاهده کنید'
+                              : 'Configure duration, icon, and label, and review live card appearance'}
+                          </p>
+                        </div>
+                      </div>
 
                       <button
                         type="button"
                         onClick={handleCancelPresetForm}
-                        className="text-xs text-[#485B44] dark:text-[#9EB598] hover:text-[#151E14] dark:hover:text-[#E8F2E4] underline cursor-pointer"
+                        className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-[#485B44] dark:text-[#9EB598] hover:bg-[#EDF6E8] dark:hover:bg-[#202E1E] transition-colors cursor-pointer"
                       >
                         {language === 'fa' ? 'انصراف' : 'Cancel'}
                       </button>
                     </div>
 
-                    {/* Preset Name */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] mb-1">
-                        {t('focus.presetName', 'Preset Name')} *
-                      </label>
-                      <input
-                        type="text"
-                        value={presetFormLabel}
-                        onChange={(e) => setPresetFormLabel(e.target.value)}
-                        placeholder={t('focus.presetNamePlaceholder', 'e.g. Ultra Deep Work, Power Nap...')}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
-                        required
-                        autoFocus
-                      />
-                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
+                      {/* Left: Form Controls */}
+                      <div className="lg:col-span-7 space-y-5">
+                        {/* Preset Name */}
+                        <div>
+                          <label className="block text-xs sm:text-sm font-bold text-[#151E14] dark:text-[#E8F2E4] mb-1.5">
+                            {t('focus.presetName', 'Preset Name')} *
+                          </label>
+                          <input
+                            type="text"
+                            value={presetFormLabel}
+                            onChange={(e) => setPresetFormLabel(e.target.value)}
+                            placeholder={t('focus.presetNamePlaceholder', 'e.g. Ultra Deep Work, Power Nap...')}
+                            className="w-full px-4 py-3 rounded-2xl bg-[#F8FAF5] dark:bg-[#202D1D] border border-[#DCEAD4] dark:border-[#2E402B] text-sm text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141] font-semibold"
+                            required
+                            autoFocus
+                          />
+                        </div>
 
-                    {/* Duration in Minutes */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] mb-1">
-                        {t('focus.presetMinutes', 'Duration (Minutes, 0 for Flowmodoro)')} *
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          min={0}
-                          max={360}
-                          value={presetFormMinutes}
-                          onChange={(e) => setPresetFormMinutes(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                          className="w-28 px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141] font-mono text-center"
-                          required
-                        />
-                        <span className="text-xs text-[#485B44] dark:text-[#9EB598]">
-                          {presetFormMinutes === 0
-                            ? (language === 'fa' ? '🚀 شمارش رو به بالا (فلومودورو)' : '🚀 Count-up open flowmodoro')
-                            : (language === 'fa' ? `${toPersianDigits(presetFormMinutes)} دقیقه تایمر معکوس` : `${presetFormMinutes} mins countdown`)}
-                        </span>
+                        {/* Duration in Minutes */}
+                        <div>
+                          <label className="block text-xs sm:text-sm font-bold text-[#151E14] dark:text-[#E8F2E4] mb-1.5">
+                            {t('focus.presetMinutes', 'Duration (Minutes, 0 for Flowmodoro)')} *
+                          </label>
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="number"
+                              min={0}
+                              max={360}
+                              value={presetFormMinutes}
+                              onChange={(e) => setPresetFormMinutes(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                              className="w-32 px-4 py-3 rounded-2xl bg-[#F8FAF5] dark:bg-[#202D1D] border border-[#DCEAD4] dark:border-[#2E402B] text-base text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141] font-mono text-center font-bold"
+                              required
+                            />
+                            <span className="text-xs sm:text-sm text-[#485B44] dark:text-[#9EB598] font-medium">
+                              {presetFormMinutes === 0
+                                ? (language === 'fa' ? '🚀 شمارش رو به بالا (فلومودورو نامحدود)' : '🚀 Open-ended count-up flowmodoro')
+                                : (language === 'fa' ? `${toPersianDigits(presetFormMinutes)} دقیقه تایمر معکوس` : `${presetFormMinutes} minutes countdown timer`)}
+                            </span>
+                          </div>
+
+                          {/* Quick pick buttons */}
+                          <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+                            <span className="text-xs text-[#485B44] dark:text-[#9EB598] font-bold mr-1">
+                              {language === 'fa' ? 'انتخاب سریع:' : 'Quick set:'}
+                            </span>
+                            {[5, 15, 20, 25, 45, 60, 90, 0].map((mins) => (
+                              <button
+                                key={mins}
+                                type="button"
+                                onClick={() => {
+                                  soundEngine.playPop();
+                                  setPresetFormMinutes(mins);
+                                }}
+                                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                  presetFormMinutes === mins
+                                    ? 'bg-[#80D141] text-[#0F2600] shadow-xs'
+                                    : 'bg-[#F8FAF5] dark:bg-[#202D1D] text-[#485B44] dark:text-[#9EB598] hover:bg-[#E8F8D8] border border-[#DCEAD4] dark:border-[#2E402B]'
+                                }`}
+                              >
+                                {mins === 0 ? (language === 'fa' ? 'فلومودورو' : 'Flow') : `${language === 'fa' ? toPersianDigits(mins) : mins}m`}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Emoji Icon Picker */}
+                        <div>
+                          <label className="block text-xs sm:text-sm font-bold text-[#151E14] dark:text-[#E8F2E4] mb-1.5">
+                            {t('focus.presetIcon', 'Emoji Icon')}
+                          </label>
+                          <div className="flex items-center gap-3 mb-2.5">
+                            <input
+                              type="text"
+                              value={presetFormIcon}
+                              onChange={(e) => setPresetFormIcon(e.target.value)}
+                              maxLength={4}
+                              className="w-16 h-12 rounded-2xl bg-[#F8FAF5] dark:bg-[#202D1D] border border-[#DCEAD4] dark:border-[#2E402B] text-2xl text-center focus:outline-none focus:ring-2 focus:ring-[#80D141] shadow-inner"
+                            />
+                            <span className="text-xs text-[#485B44] dark:text-[#9EB598]">
+                              {language === 'fa' ? 'یا روی نمادهای پیشنهادی کلیک کنید:' : 'or click any icon below to select:'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {['⚡', '🎯', '🍅', '🌊', '🚀', '⏱️', '🧘', '☕', '💡', '🔥', '🏆', '🧠', '📚', '💻', '🌿', '✨', '⭐', '🎨'].map((emoji) => (
+                              <button
+                                key={emoji}
+                                type="button"
+                                onClick={() => {
+                                  soundEngine.playPop();
+                                  setPresetFormIcon(emoji);
+                                }}
+                                className={`w-10 h-10 rounded-2xl text-lg flex items-center justify-center transition-all cursor-pointer ${
+                                  presetFormIcon === emoji
+                                    ? 'bg-[#80D141] scale-110 shadow-md ring-2 ring-[#80D141]'
+                                    : 'bg-[#F8FAF5] dark:bg-[#202D1D] hover:bg-[#E8F8D8] dark:hover:bg-[#2A3E26] border border-[#DCEAD4] dark:border-[#2E402B]'
+                                }`}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Description */}
+                        <div>
+                          <label className="block text-xs sm:text-sm font-bold text-[#151E14] dark:text-[#E8F2E4] mb-1.5">
+                            {t('focus.presetDesc', 'Description (Optional)')}
+                          </label>
+                          <input
+                            type="text"
+                            value={presetFormDesc}
+                            onChange={(e) => setPresetFormDesc(e.target.value)}
+                            placeholder={t('focus.presetDescPlaceholder', 'e.g. 60 min sustained deep flow')}
+                            className="w-full px-4 py-3 rounded-2xl bg-[#F8FAF5] dark:bg-[#202D1D] border border-[#DCEAD4] dark:border-[#2E402B] text-xs sm:text-sm text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
+                          />
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                        <span className="text-[11px] text-[#485B44] dark:text-[#9EB598]">
-                          {language === 'fa' ? 'پیشنهادی:' : 'Quick set:'}
-                        </span>
-                        {[5, 15, 20, 25, 45, 60, 90, 0].map((mins) => (
+
+                      {/* Right: Live Interactive Tile Preview */}
+                      <div className="lg:col-span-5 flex flex-col justify-between p-5 sm:p-6 rounded-3xl bg-[#F8FAF5] dark:bg-[#1E2B1A] border border-[#DCEAD4] dark:border-[#2A3E26]">
+                        <div>
+                          <span className="text-xs font-bold uppercase tracking-wider text-[#3B7E10] dark:text-[#80D141] block mb-2">
+                            {language === 'fa' ? 'پیش‌نمایش زنده کلید تایمر' : 'Live Tile Preview'}
+                          </span>
+                          <p className="text-xs text-[#485B44] dark:text-[#9EB598] mb-5">
+                            {language === 'fa'
+                              ? 'کلید انتخابی در نوار حالت‌های تایمر به این شکل نمایش داده خواهد شد:'
+                              : 'This is how your preset button will appear in the focus timer bar:'}
+                          </p>
+
+                          {/* Preview Tile */}
+                          <div className="max-w-[220px] mx-auto p-4 rounded-3xl bg-[#80D141] text-[#0F2600] shadow-md border border-[#80D141] flex flex-col items-center justify-between text-center min-h-[110px] gap-2">
+                            <span className="text-2xl">{presetFormIcon || '⏱️'}</span>
+                            <span className="font-bold text-sm leading-tight">
+                              {presetFormLabel.trim() || (language === 'fa' ? 'نام پیش‌تنظیم' : 'Preset Name')}
+                            </span>
+                            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#0F2600]/15 text-[#0F2600]">
+                              {presetFormMinutes === 0
+                                ? (language === 'fa' ? 'فلومودورو' : 'Flowmodoro')
+                                : `${language === 'fa' ? toPersianDigits(presetFormMinutes) : presetFormMinutes} ${t('focus.minsUnit')}`}
+                            </span>
+                          </div>
+
+                          {presetFormDesc && (
+                            <p className="text-center text-xs text-[#485B44] dark:text-[#9EB598] mt-3 italic">
+                              "{presetFormDesc}"
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Form Action Buttons in Preview Column */}
+                        <div className="flex items-center gap-3 pt-6 mt-6 border-t border-[#DCEAD4] dark:border-[#2A3E26]">
                           <button
-                            key={mins}
                             type="button"
-                            onClick={() => {
-                              soundEngine.playPop();
-                              setPresetFormMinutes(mins);
-                            }}
-                            className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                              presetFormMinutes === mins
-                                ? 'bg-[#80D141] text-[#0F2600]'
-                                : 'bg-white dark:bg-[#22301F] text-[#485B44] dark:text-[#9EB598] hover:bg-[#E8F8D8]'
-                            }`}
+                            onClick={handleCancelPresetForm}
+                            className="flex-1 py-3 rounded-2xl text-xs sm:text-sm font-bold text-[#485B44] dark:text-[#9EB598] hover:bg-[#EDF6E8] dark:hover:bg-[#253522] transition-colors cursor-pointer text-center"
                           >
-                            {mins === 0 ? (language === 'fa' ? 'فلو' : 'Flow') : `${language === 'fa' ? toPersianDigits(mins) : mins}m`}
+                            {language === 'fa' ? 'انصراف' : 'Cancel'}
                           </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Emoji Icon Picker */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] mb-1">
-                        {t('focus.presetIcon', 'Emoji Icon')}
-                      </label>
-                      <div className="flex items-center gap-2 mb-2">
-                        <input
-                          type="text"
-                          value={presetFormIcon}
-                          onChange={(e) => setPresetFormIcon(e.target.value)}
-                          maxLength={4}
-                          className="w-14 h-10 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-lg text-center focus:outline-none focus:ring-2 focus:ring-[#80D141]"
-                        />
-                        <span className="text-[11px] text-[#485B44] dark:text-[#9EB598]">
-                          {language === 'fa' ? 'یا یکی از این موارد را انتخاب کنید:' : 'or click a suggestion:'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {['⚡', '🎯', '🍅', '🌊', '🚀', '⏱️', '🧘', '☕', '💡', '🔥', '🏆', '🧠', '📚', '💻', '🌿', '✨'].map((emoji) => (
                           <button
-                            key={emoji}
-                            type="button"
-                            onClick={() => {
-                              soundEngine.playPop();
-                              setPresetFormIcon(emoji);
-                            }}
-                            className={`w-8 h-8 rounded-xl text-base flex items-center justify-center transition-all cursor-pointer ${
-                              presetFormIcon === emoji
-                                ? 'bg-[#80D141] scale-110 shadow-xs'
-                                : 'bg-white dark:bg-[#22301F] hover:bg-[#E8F8D8] dark:hover:bg-[#2A3E26]'
-                            }`}
+                            type="submit"
+                            className="flex-1 py-3 rounded-2xl bg-[#80D141] hover:bg-[#72BF36] text-[#0F2600] text-xs sm:text-sm font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
                           >
-                            {emoji}
+                            <Check className="w-4 h-4 stroke-[3]" />
+                            <span>{language === 'fa' ? 'ذخیره پیش‌تنظیم' : 'Save Preset'}</span>
                           </button>
-                        ))}
+                        </div>
                       </div>
-                    </div>
-
-                    {/* Description */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#151E14] dark:text-[#E8F2E4] mb-1">
-                        {t('focus.presetDesc', 'Description (Optional)')}
-                      </label>
-                      <input
-                        type="text"
-                        value={presetFormDesc}
-                        onChange={(e) => setPresetFormDesc(e.target.value)}
-                        placeholder={t('focus.presetDescPlaceholder', 'e.g. 60 min sustained deep flow')}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-[#22301F] border border-[#DCEAD4] dark:border-[#2E402B] text-xs text-[#151E14] dark:text-[#E8F2E4] focus:outline-none focus:ring-2 focus:ring-[#80D141]"
-                      />
-                    </div>
-
-                    {/* Form Action Buttons */}
-                    <div className="flex items-center justify-end gap-2 pt-2">
-                      <button
-                        type="button"
-                        onClick={handleCancelPresetForm}
-                        className="px-4 py-2 rounded-xl text-xs font-bold text-[#485B44] dark:text-[#9EB598] hover:bg-[#EDF6E8] dark:hover:bg-[#253522] transition-colors cursor-pointer"
-                      >
-                        {language === 'fa' ? 'انصراف' : 'Cancel'}
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-5 py-2 rounded-xl bg-[#80D141] hover:bg-[#72BF36] text-[#0F2600] text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                        <span>{language === 'fa' ? 'ذخیره پیش‌تنظیم' : 'Save Preset'}</span>
-                      </button>
                     </div>
                   </form>
                 ) : (
-                  /* Mode B: Presets List with Add and Reset actions */
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <button
-                        type="button"
-                        id="btn-add-new-preset"
-                        onClick={handleOpenAddPreset}
-                        className="px-3.5 py-2 rounded-xl bg-[#80D141] hover:bg-[#72BF36] text-[#0F2600] text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                        <span>{t('focus.addPreset', 'Add Preset')}</span>
-                      </button>
+                  /* View 2: Presets Grid List with Quick Actions */
+                  <div className="space-y-6">
+                    {/* Header Banner & Stats */}
+                    <div className="bg-white dark:bg-[#182316] rounded-3xl p-5 sm:p-6 shadow-sm border border-[#DCEAD4] dark:border-[#263722] flex items-center justify-between gap-4 flex-wrap">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#80D141] animate-pulse" />
+                          <h3 className="font-bold text-base text-[#151E14] dark:text-[#E8F2E4] font-display">
+                            {language === 'fa'
+                              ? `${toPersianDigits(presetsList.length)} پیش‌تنظیم تمرکز پیکربندی‌شده`
+                              : `${presetsList.length} Focus Presets Configured`}
+                          </h3>
+                        </div>
+                        <p className="text-xs text-[#485B44] dark:text-[#9EB598]">
+                          {language === 'fa'
+                            ? 'روی هر پیش‌تنظیم کلیک کنید تا به عنوان حالت فعال تایمر انتخاب شود یا آن را ویرایش کنید'
+                            : 'Click any preset to activate it immediately in the timer, or use Edit/Delete to customize'}
+                        </p>
+                      </div>
 
-                      <button
-                        type="button"
-                        onClick={handleResetPresets}
-                        className="px-3 py-2 rounded-xl bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] dark:hover:bg-[#283A23] text-[#245209] dark:text-[#80D141] text-xs font-bold border border-[#DCEAD4] dark:border-[#263722] flex items-center gap-1.5 transition-colors cursor-pointer"
-                        title={t('focus.resetPresets', 'Reset to Defaults')}
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>{t('focus.resetPresets', 'Reset to Defaults')}</span>
-                      </button>
+                      <div className="flex items-center gap-2.5">
+                        <button
+                          type="button"
+                          id="btn-add-new-preset-body"
+                          onClick={handleOpenAddPreset}
+                          className="px-4 py-2.5 rounded-2xl bg-[#80D141] hover:bg-[#72BF36] text-[#0F2600] text-xs sm:text-sm font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                        >
+                          <Plus className="w-4 h-4 stroke-[2.5]" />
+                          <span>{t('focus.addPreset', 'Add Preset')}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleResetPresets}
+                          className="px-3.5 py-2.5 rounded-2xl bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] dark:hover:bg-[#283A23] text-[#245209] dark:text-[#80D141] text-xs sm:text-sm font-bold border border-[#DCEAD4] dark:border-[#263722] flex items-center gap-1.5 transition-colors cursor-pointer active:scale-95 shadow-xs"
+                          title={t('focus.resetPresets', 'Reset to Defaults')}
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>{t('focus.resetPresets', 'Reset Defaults')}</span>
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="space-y-2 pt-1">
+                    {/* Presets Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {presetsList.map((preset, idx) => {
                         const isCurrentActive = mode === preset.id;
                         return (
                           <div
                             key={preset.id || idx}
-                            className={`p-3 sm:p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                            className={`p-5 rounded-3xl border transition-all flex flex-col justify-between gap-4 ${
                               isCurrentActive
-                                ? 'bg-[#80D141]/10 dark:bg-[#80D141]/15 border-[#80D141]'
-                                : 'bg-[#F7FAF4] dark:bg-[#1C2919] border-[#DCEAD4] dark:border-[#2A3E26]'
+                                ? 'bg-[#80D141]/10 dark:bg-[#80D141]/15 border-[#80D141] ring-2 ring-[#80D141]/30 shadow-sm'
+                                : 'bg-white dark:bg-[#182316] border-[#DCEAD4] dark:border-[#263722] hover:border-[#80D141]/50 shadow-2xs'
                             }`}
                           >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <span className="w-10 h-10 rounded-xl bg-white dark:bg-[#263722] border border-[#DCEAD4] dark:border-[#33482E] flex items-center justify-center text-xl shrink-0 shadow-xs">
-                                {preset.icon || '⏱️'}
-                              </span>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <h4 className="font-bold text-sm text-[#151E14] dark:text-[#E8F2E4] truncate">
-                                    {preset.label}
-                                  </h4>
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#EDF6E8] dark:bg-[#233520] text-[#3B7E10] dark:text-[#80D141] border border-[#D0E2C8] dark:border-[#2E432A]">
+                            <div className="space-y-3">
+                              <div className="flex items-start justify-between gap-2">
+                                <span className="w-12 h-12 rounded-2xl bg-[#EDF6E8] dark:bg-[#263722] border border-[#DCEAD4] dark:border-[#33482E] flex items-center justify-center text-2xl shrink-0 shadow-xs">
+                                  {preset.icon || '⏱️'}
+                                </span>
+
+                                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                                  {isCurrentActive && (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#80D141] text-[#0F2600] flex items-center gap-1 shadow-2xs">
+                                      <Check className="w-3 h-3 stroke-[3]" />
+                                      <span>{language === 'fa' ? 'انتخاب‌شده' : 'Active'}</span>
+                                    </span>
+                                  )}
+                                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-[#EDF6E8] dark:bg-[#233520] text-[#3B7E10] dark:text-[#80D141] border border-[#D0E2C8] dark:border-[#2E432A]">
                                     {preset.minutes === 0
                                       ? (language === 'fa' ? 'فلومودورو' : 'Flowmodoro')
                                       : `${language === 'fa' ? toPersianDigits(preset.minutes) : preset.minutes} ${t('focus.minsUnit')}`}
                                   </span>
-                                  {isCurrentActive && (
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[#80D141] text-[#0F2600]">
-                                      {language === 'fa' ? 'انتخاب‌شده' : 'Active'}
-                                    </span>
-                                  )}
                                 </div>
-                                {preset.desc && (
-                                  <p className="text-[11px] text-[#485B44] dark:text-[#9EB598] truncate mt-0.5">
+                              </div>
+
+                              <div>
+                                <h4 className="font-bold text-base text-[#151E14] dark:text-[#E8F2E4] truncate">
+                                  {preset.label}
+                                </h4>
+                                {preset.desc ? (
+                                  <p className="text-xs text-[#485B44] dark:text-[#9EB598] line-clamp-2 mt-1">
                                     {preset.desc}
+                                  </p>
+                                ) : (
+                                  <p className="text-xs text-[#79747E] dark:text-[#7D9179] mt-1 italic">
+                                    {language === 'fa' ? 'بدون توضیح' : 'No description'}
                                   </p>
                                 )}
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditPreset(preset)}
-                                className="p-2 rounded-xl bg-white dark:bg-[#263722] hover:bg-[#E8F8D8] dark:hover:bg-[#2E4229] text-[#485B44] dark:text-[#9EB598] hover:text-[#151E14] dark:hover:text-[#E8F2E4] border border-[#DCEAD4] dark:border-[#33482E] transition-all cursor-pointer shadow-2xs"
-                                title={t('focus.editPreset', 'Edit Preset')}
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
+                            {/* Card Footer Actions */}
+                            <div className="pt-3 border-t border-[#DCEAD4]/80 dark:border-[#263722] flex items-center justify-between gap-2">
+                              {isCurrentActive ? (
+                                <span className="text-xs font-bold text-[#3B7E10] dark:text-[#80D141] flex items-center gap-1">
+                                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                                  <span>{language === 'fa' ? 'در حال اجرا' : 'Current Mode'}</span>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleSelectMode(preset.id as FocusTimerMode);
+                                    soundEngine.playGentleChime();
+                                    setPresetSuccessMsg(language === 'fa' ? `حالت ${preset.label} فعال شد!` : `Activated ${preset.label}!`);
+                                    setTimeout(() => setPresetSuccessMsg(null), 2500);
+                                  }}
+                                  className="px-3 py-1.5 rounded-xl bg-[#EDF6E8] dark:bg-[#22301F] hover:bg-[#DDF4CD] text-[#245209] dark:text-[#80D141] text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                                >
+                                  {language === 'fa' ? 'انتخاب برای تایمر' : 'Set as Active'}
+                                </button>
+                              )}
 
-                              <button
-                                type="button"
-                                onClick={() => handleDeletePreset(preset.id)}
-                                disabled={presetsList.length <= 1}
-                                className="p-2 rounded-xl bg-white dark:bg-[#263722] hover:bg-rose-50 dark:hover:bg-rose-950/40 text-[#485B44] dark:text-[#9EB598] hover:text-rose-600 dark:hover:text-rose-400 border border-[#DCEAD4] dark:border-[#33482E] disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs"
-                                title={t('focus.deletePreset', 'Delete Preset')}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditPreset(preset)}
+                                  className="p-2 rounded-xl bg-[#F8FAF5] dark:bg-[#263722] hover:bg-[#E8F8D8] dark:hover:bg-[#2E4229] text-[#485B44] dark:text-[#9EB598] hover:text-[#151E14] dark:hover:text-[#E8F2E4] border border-[#DCEAD4] dark:border-[#33482E] transition-all cursor-pointer shadow-2xs"
+                                  title={t('focus.editPreset', 'Edit Preset')}
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePreset(preset.id)}
+                                  disabled={presetsList.length <= 1}
+                                  className="p-2 rounded-xl bg-[#F8FAF5] dark:bg-[#263722] hover:bg-rose-50 dark:hover:bg-rose-950/40 text-[#485B44] dark:text-[#9EB598] hover:text-rose-600 dark:hover:text-rose-400 border border-[#DCEAD4] dark:border-[#33482E] disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs"
+                                  title={t('focus.deletePreset', 'Delete Preset')}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
                           </div>
                         );
@@ -1278,29 +1446,29 @@ export const FocusTracker: React.FC<FocusTrackerProps> = ({
                   </div>
                 )}
               </div>
+            </div>
 
-              {/* Modal Footer */}
-              <div className="pt-3 border-t border-[#DCEAD4] dark:border-[#263722] flex items-center justify-between text-xs text-[#485B44] dark:text-[#9EB598] shrink-0">
-                <span>
-                  {language === 'fa'
-                    ? `${toPersianDigits(presetsList.length)} پیش‌تنظیم موجود`
-                    : `${presetsList.length} presets configured`}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundEngine.playPop();
-                    setShowPresetManagerModal(false);
-                    setEditingPreset(null);
-                    setIsCreatingNewPreset(false);
-                  }}
-                  className="px-4 py-2 rounded-xl bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#E2F2D9] text-[#245209] dark:text-[#80D141] font-bold transition-colors cursor-pointer"
-                >
-                  {language === 'fa' ? 'بستن' : 'Done'}
-                </button>
-              </div>
-            </motion.div>
-          </div>
+            {/* Bottom Footer Bar */}
+            <footer className="h-14 sm:h-16 bg-white/95 dark:bg-[#152014]/95 backdrop-blur-md border-t border-[#DCEAD4] dark:border-[#263722] px-4 sm:px-8 flex items-center justify-between text-xs sm:text-sm text-[#485B44] dark:text-[#9EB598] shrink-0">
+              <span className="font-medium">
+                {language === 'fa'
+                  ? `${toPersianDigits(presetsList.length)} پیش‌تنظیم در دسترس در صفحه تمرکز`
+                  : `${presetsList.length} presets available in Focus mode`}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  soundEngine.playPop();
+                  setShowPresetManagerModal(false);
+                  setEditingPreset(null);
+                  setIsCreatingNewPreset(false);
+                }}
+                className="px-5 py-2 rounded-xl bg-[#80D141] hover:bg-[#72BF36] text-[#0F2600] font-bold shadow-xs transition-colors cursor-pointer active:scale-95"
+              >
+                {language === 'fa' ? 'اتمام و بازگشت' : 'Done & Return'}
+              </button>
+            </footer>
+          </motion.div>
         )}
       </AnimatePresence>
       </>
