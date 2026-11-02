@@ -9,7 +9,13 @@ import {
   AlertCircle, 
   Sparkles,
   ChevronDown,
-  Volume2
+  Volume2,
+  Smartphone,
+  Share2,
+  CalendarPlus,
+  CalendarX,
+  ExternalLink,
+  CheckCircle2,
 } from 'lucide-react';
 import { EntryReminder, Language, ReminderIntensity } from '../../types';
 import { 
@@ -19,6 +25,13 @@ import {
   getNotificationPermission, 
   requestNotificationPermission 
 } from '../../utils/reminderManager';
+import { 
+  addReminderToPhoneCalendar, 
+  removeReminderFromPhoneCalendar, 
+  shareReminderToPhoneSheet, 
+  getGoogleCalendarReminderUrl, 
+  PhoneReminderItem 
+} from '../../utils/phoneReminderSync';
 import { useI18n, toPersianDigits } from '../../utils/i18n';
 import { soundEngine } from '../../utils/audioSynth';
 
@@ -29,13 +42,18 @@ interface ReminderPickerProps {
   targetDate?: string; // e.g. "2026-10-23"
   itemType?: 'task' | 'event' | 'habit';
   allowMultiple?: boolean;
+  itemTitle?: string;
+  itemId?: string;
 }
 
 export const ReminderPicker: React.FC<ReminderPickerProps> = ({
   reminders = [],
   onChange,
   targetTime,
+  targetDate,
   itemType = 'task',
+  itemTitle,
+  itemId,
 }) => {
   const { t, language } = useI18n();
   const isFa = language === 'fa';
@@ -43,6 +61,9 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
   const [isAddingCustom, setIsAddingCustom] = useState(false);
   const [customMinutesInput, setCustomMinutesInput] = useState('45');
   const [permission, setPermission] = useState(getNotificationPermission());
+  const [phoneSyncStatus, setPhoneSyncStatus] = useState<string | null>(null);
+
+  const canShare = typeof window !== 'undefined' && typeof navigator !== 'undefined' && Boolean(navigator.share);
 
   const handleRequestPermission = async () => {
     soundEngine.playPop();
@@ -113,6 +134,54 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
         return { ...r, intensity: next };
       })
     );
+  };
+
+  const getEffectivePhoneItem = (): PhoneReminderItem => {
+    const effectiveDate = targetDate || new Date().toISOString().slice(0, 10);
+    const primaryOffset = reminders[0]?.offsetMinutes ?? 0;
+    return {
+      id: itemId || `rem-${Date.now()}`,
+      title: itemTitle || (isFa ? 'یادآور لرنی' : 'Lerni Reminder'),
+      date: effectiveDate,
+      time: targetTime || '09:00',
+      offsetMinutes: primaryOffset,
+      intensity: selectedIntensity,
+      notes: isFa ? 'تنظیم‌شده از طریق دستیار لرنی' : 'Scheduled via Lerni companion',
+    };
+  };
+
+  const handleAddToPhone = () => {
+    soundEngine.playGentleChime();
+    const item = getEffectivePhoneItem();
+    addReminderToPhoneCalendar(item);
+    setPhoneSyncStatus(
+      isFa
+        ? 'فایل یادآور گوشی (.ics) ایجاد شد! آن را باز کنید تا در تقویم یا Reminders گوشی ذخیره شود.'
+        : 'Reminder file (.ics) downloaded! Tap to open and save to phone Reminders/Calendar.'
+    );
+    setTimeout(() => setPhoneSyncStatus(null), 6000);
+  };
+
+  const handleRemoveFromPhone = () => {
+    soundEngine.playPop();
+    const item = getEffectivePhoneItem();
+    removeReminderFromPhoneCalendar(item);
+    setPhoneSyncStatus(
+      isFa
+        ? 'فایل لغو یادآور (.ics) ایجاد شد! با باز کردن آن، هشدار از تقویم یا Reminders گوشی پاک می‌شود.'
+        : 'Cancellation file (.ics) downloaded! Open it to remove from phone Reminders/Calendar.'
+    );
+    setTimeout(() => setPhoneSyncStatus(null), 6000);
+  };
+
+  const handleShareToPhone = async () => {
+    soundEngine.playPop();
+    const item = getEffectivePhoneItem();
+    const shared = await shareReminderToPhoneSheet(item);
+    if (shared) {
+      setPhoneSyncStatus(isFa ? 'با موفقیت در اشتراک‌گذاری گوشی قرار گرفت!' : 'Opened in phone share sheet!');
+      setTimeout(() => setPhoneSyncStatus(null), 4000);
+    }
   };
 
   return (
@@ -375,6 +444,75 @@ export const ReminderPicker: React.FC<ReminderPickerProps> = ({
             </form>
           )}
         </div>
+      </div>
+
+      {/* Phone Reminders App Sync Section */}
+      <div className="pt-2.5 border-t border-[#DCEAD4] dark:border-[#263722] space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-1.5">
+            <Smartphone className="w-3.5 h-3.5 text-[#3B7E10] dark:text-[#80D141]" />
+            <span>{isFa ? 'همگام‌سازی با برنامه یادآور گوشی' : 'Sync with Phone Reminders App'}</span>
+          </span>
+          <span className="text-[10px] text-[#485B44] dark:text-[#9EB598]">
+            {isFa ? 'اپل Reminders، گوگل و تقویم' : 'Apple Reminders, Google & Cal'}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {/* 1-Tap Add to Phone (.ics) */}
+          <button
+            type="button"
+            onClick={handleAddToPhone}
+            className="px-2.5 py-1.5 rounded-xl bg-[#E8F8D8] dark:bg-[#1E3800] hover:bg-[#D4F0BD] dark:hover:bg-[#254600] text-[#1C3700] dark:text-[#80D141] text-xs font-bold border border-[#80D141]/50 flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-95"
+            title="Export .ics with alarm to open in Apple Reminders/Calendar or Android Calendar"
+          >
+            <CalendarPlus className="w-3.5 h-3.5" />
+            <span>{isFa ? 'افزودن به یادآور گوشی (.ics)' : 'Add to Phone (.ics)'}</span>
+          </button>
+
+          {/* 1-Tap Remove from Phone (.ics Cancel) */}
+          <button
+            type="button"
+            onClick={handleRemoveFromPhone}
+            className="px-2.5 py-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 text-xs font-bold border border-rose-200 dark:border-rose-900/50 flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-95"
+            title="Export cancellation event to prompt phone to delete this reminder"
+          >
+            <CalendarX className="w-3.5 h-3.5" />
+            <span>{isFa ? 'حذف از گوشی (.ics)' : 'Remove from Phone (.ics)'}</span>
+          </button>
+
+          {/* Native Web Share (iOS Share Sheet -> Reminders) */}
+          {canShare && (
+            <button
+              type="button"
+              onClick={handleShareToPhone}
+              className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#202E1E] hover:bg-[#F0F5EC] dark:hover:bg-[#2A3E26] text-[#2F6B12] dark:text-[#9DD97A] text-xs font-bold border border-[#DCEAD4] dark:border-[#2C4027] flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-95"
+              title="Open native share sheet to select Reminders or Tasks app"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>{isFa ? 'ارسال به Reminders گوشی' : 'Share to Reminders'}</span>
+            </button>
+          )}
+
+          {/* Google Calendar Link */}
+          <a
+            href={getGoogleCalendarReminderUrl(getEffectivePhoneItem())}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-[#202E1E] hover:bg-[#F0F5EC] dark:hover:bg-[#2A3E26] text-[#2F6B12] dark:text-[#9DD97A] text-xs font-bold border border-[#DCEAD4] dark:border-[#2C4027] flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+            title="Open in Google Calendar / Tasks"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span>{isFa ? 'تقویم گوگل' : 'Google Cal'}</span>
+          </a>
+        </div>
+
+        {phoneSyncStatus && (
+          <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-[11px] font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <span>{phoneSyncStatus}</span>
+          </div>
+        )}
       </div>
     </div>
   );

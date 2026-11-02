@@ -147,6 +147,23 @@ export async function dispatchBrowserNotification(
   }
 }
 
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+export async function registerWebPushSubscription(): Promise<PushSubscription | null> {
+  // Static frontend on GitHub Pages: PushManager server endpoints are not present.
+  // In-browser Service Worker alarms, Web Worker heartbeats, and Notification Triggers are used.
+  return null;
+}
+
 /**
  * Send a sample/test notification to verify system sounds and display
  */
@@ -361,6 +378,7 @@ export function startStrongReminderInSW(
 export function stopStrongReminderInSW(alertId: string): void {
   // Always stop client audio loop as well
   soundEngine.stopStrongAlarmLoop(alertId);
+
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
   try {
     navigator.serviceWorker.controller?.postMessage({
@@ -373,6 +391,7 @@ export function stopStrongReminderInSW(alertId: string): void {
 export function notifyServiceWorkerUserEntered(): void {
   // Silence all active client strong alarms
   soundEngine.stopAllStrongAlarms();
+
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
   try {
     navigator.serviceWorker.controller?.postMessage({

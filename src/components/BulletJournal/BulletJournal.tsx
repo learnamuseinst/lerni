@@ -615,6 +615,7 @@ export const BulletJournal: React.FC<BulletJournalProps> = ({
         itemType={reminderTargetEntry?.type || 'task'}
         targetTime={reminderTargetEntry?.time}
         targetDate={reminderTargetEntry?.date}
+        itemId={reminderTargetEntry?.id}
         reminders={reminderTargetEntry?.reminders || []}
         onSave={(updatedReminders) => {
           if (!reminderTargetEntry) return;

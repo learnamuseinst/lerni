@@ -49,6 +49,8 @@ import {
   ChevronsUpDown,
   Smartphone,
   Bell,
+  CalendarPlus,
+  Share2,
 } from 'lucide-react';
 import {
   UserPreferences,
@@ -85,7 +87,10 @@ import {
   getUpcomingRemindersForDate,
   formatReminderOffset,
   stopStrongReminderInSW,
+  startStrongReminderInSW,
+  dispatchBrowserNotification,
 } from '../utils/reminderManager';
+import { exportAllRemindersToIcs, PhoneReminderItem } from '../utils/phoneReminderSync';
 
 interface SettingsSectionProps {
   prefs: UserPreferences;
@@ -326,6 +331,145 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
       isDraftFa ? 'هشدار آزمایشی شدید متوقف شد.' : 'Strong test alarm stopped.'
     );
     setTimeout(() => setTestNotifMessage(null), 3000);
+  };
+
+  const handleScheduleClosedAppTest = async (intensity: ReminderIntensity = 'normal') => {
+    setIsTestingNotif(true);
+    soundEngine.playPop();
+    try {
+      const perm = getNotificationPermission();
+      if (perm !== 'granted') {
+        const reqResult = await requestNotificationPermission();
+        setNotifPermission(reqResult);
+        if (reqResult !== 'granted') {
+          setTestNotifMessage(
+            isDraftFa
+              ? 'لطفاً ابتدا دسترسی به اعلان‌ها را تایید کنید.'
+              : 'Please grant notification permissions first.'
+          );
+          setTimeout(() => setTestNotifMessage(null), 5000);
+          return;
+        }
+      }
+
+      const testId = `test-rem-${Date.now()}`;
+      const triggerTimeMs = Date.now() + 6000;
+      const title = intensity === 'strong'
+        ? (isDraftFa ? '🚨 [STRONG / شدید] یادآور ۶ ثانیه‌ای لرنی' : '🚨 [STRONG] Lerni 6s Reminder')
+        : (isDraftFa ? '🔔 یادآور ۶ ثانیه‌ای لرنی' : '🔔 Lerni 6s Reminder');
+      const body = isDraftFa
+        ? (intensity === 'strong'
+            ? 'یادآور شدید با تکرار مداوم هر ۳ ثانیه فعال شد!'
+            : 'اعلان آزمایشی ۶ ثانیه‌ای با موفقیت ارسال شد.')
+        : (intensity === 'strong'
+            ? 'Strong reminder triggered with 3s continuous repeats!'
+            : '6-second reminder test notification delivered!');
+
+      const testItem = {
+        id: testId,
+        title: isDraftFa ? 'آزمایش یادآور پس‌زمینه' : 'Background Reminder Test',
+        label: isDraftFa ? '۶ ثانیه پس از خروج' : 'Delivered 6s later',
+        time: '00:00',
+        triggerTimeMs,
+        intensity,
+        isFa: isDraftFa,
+        entryType: 'task' as const,
+      };
+
+      // Sync test item to Service Worker
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then((reg) => {
+          reg.active?.postMessage({
+            type: 'SYNC_SCHEDULED_REMINDERS',
+            reminders: [testItem],
+          });
+        }).catch(() => {});
+      }
+
+      // Schedule client-side timeout so it fires reliably in active/background tab
+      setTimeout(() => {
+        if (intensity === 'strong') {
+          soundEngine.startStrongAlarmLoop(testId);
+          setActiveStrongTest(true);
+          startStrongReminderInSW(testId, title, body, { isTest: true, isFa: isDraftFa });
+        } else {
+          soundEngine.playGentleChime();
+        }
+        dispatchBrowserNotification(title, body, testId, intensity, { isTest: true, isFa: isDraftFa });
+      }, 6000);
+
+      setTestNotifMessage(
+        isDraftFa
+          ? 'یادآور ۶ ثانیه‌ای تنظیم شد! می‌توانید تب را کوچک یا ترک کنید تا دریافت اعلان را مشاهده کنید.'
+          : 'Scheduled for 6s! You can minimize or switch tabs now to test delivery.'
+      );
+      setTimeout(() => setTestNotifMessage(null), 9000);
+    } catch {
+      setTestNotifMessage(
+        isDraftFa ? 'خطا در زمان‌بندی اعلان.' : 'Failed to schedule reminder test.'
+      );
+      setTimeout(() => setTestNotifMessage(null), 4000);
+    } finally {
+      setIsTestingNotif(false);
+    }
+  };
+
+  const [phoneExportStatus, setPhoneExportStatus] = useState<string | null>(null);
+
+  const handleExportAllToPhone = () => {
+    soundEngine.playGentleChime();
+    const items: PhoneReminderItem[] = [];
+
+    // Gather tasks & events reminders
+    for (const entry of bujoEntries) {
+      if (entry.status !== 'open' || !entry.reminders || entry.reminders.length === 0) continue;
+      for (const rem of entry.reminders) {
+        if (rem.enabled === false) continue;
+        items.push({
+          id: `bujo-${entry.id}-${rem.id}`,
+          title: entry.content,
+          date: entry.date,
+          time: entry.time || '09:00',
+          offsetMinutes: rem.offsetMinutes,
+          intensity: rem.intensity || 'normal',
+        });
+      }
+    }
+
+    // Gather habit reminders for today
+    const todayStr = getTodayDateString();
+    for (const habit of habits) {
+      if (habit.isArchived || !habit.reminders || habit.reminders.length === 0) continue;
+      for (const rem of habit.reminders) {
+        if (rem.enabled === false) continue;
+        items.push({
+          id: `habit-${habit.id}-${rem.id}`,
+          title: habit.title,
+          date: todayStr,
+          time: habit.time || '09:00',
+          offsetMinutes: rem.offsetMinutes,
+          intensity: rem.intensity || 'normal',
+        });
+      }
+    }
+
+    if (items.length === 0) {
+      setPhoneExportStatus(
+        isDraftFa
+          ? 'یادآور فعالی برای خروجی یافت نشد.'
+          : 'No active reminders found to export.'
+      );
+      setTimeout(() => setPhoneExportStatus(null), 4000);
+      return;
+    }
+
+    exportAllRemindersToIcs(items);
+    setPhoneExportStatus(
+      isDraftFa
+        ? `${toPersianDigits(items.length)} یادآور با موفقیت در فایل تقویم (.ics) ذخیره شد! آن را باز کنید تا وارد تقویم یا Reminders گوشی شود.`
+        : `${items.length} reminders exported to .ics! Open the file to import into your phone's Reminders/Calendar.`
+    );
+    setTimeout(() => setPhoneExportStatus(null), 7000);
   };
 
   // Active language in current session and draft preview
@@ -3294,6 +3438,17 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                           <span>{t('reminders.testStrong', 'Test Strong (3s Repeat)')}</span>
                         </button>
 
+                        <button
+                          type="button"
+                          onClick={() => handleScheduleClosedAppTest('strong')}
+                          disabled={isTestingNotif}
+                          className="px-3 py-1.5 rounded-xl bg-[#EDF6E8] dark:bg-[#1E2B1A] hover:bg-[#DDF4CD] text-[#245209] dark:text-[#80D141] text-xs font-bold border border-[#DCEAD4] dark:border-[#263722] flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer active:scale-95"
+                          title="Schedule notification in 6 seconds to verify background delivery"
+                        >
+                          <Smartphone className="w-3.5 h-3.5" />
+                          <span>{isDraftFa ? 'آزمایش در پس‌زمینه (۶ ثانیه بعد)' : 'Test Background (6s)'}</span>
+                        </button>
+
                         {activeStrongTest && (
                           <button
                             type="button"
@@ -3319,7 +3474,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                     <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/25 border border-amber-200/80 dark:border-amber-900/40 text-xs space-y-2">
                       <div className="font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
                         <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                        <span>{isDraftFa ? 'آشنایی با نحوه کارکرد یادآورها و اجرای بدون نیاز به باز بودن برنامه' : 'Reminder Urgency Modes & Closed-App Reliability'}</span>
+                        <span>{isDraftFa ? 'آشنایی با نحوه کارکرد یادآورها و اجرای بدون سرور (GitHub Pages)' : 'Reminder Urgency Modes & Frontend Reliability'}</span>
                       </div>
                       <div className="text-[11px] text-amber-950/90 dark:text-amber-200/90 space-y-1.5 leading-relaxed">
                         <div className="flex items-start gap-2">
@@ -3332,7 +3487,7 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                         </div>
                         <div className="pt-2 border-t border-amber-200/60 dark:border-amber-900/40 text-[10.5px] text-[#485B44] dark:text-[#9EB598] flex items-start gap-1.5">
                           <span className="shrink-0">🛡️</span>
-                          <span>{t('reminders.closedAppNotice', 'Reminders run even when Lerni is closed (via Service Worker background alarms & OS notification triggers).')}</span>
+                          <span>{isDraftFa ? 'یادآورها به صورت ۱۰۰٪ کلاینت‌محور (Service Worker، Web Worker و اعلان‌های سیستم) بدون نیاز به سرور کار می‌کنند و برای میزبانی در GitHub Pages آماده‌اند.' : 'Reminders run 100% client-side via Service Worker alarms, Web Worker heartbeats & browser notifications, fully static and GitHub Pages ready.'}</span>
                         </div>
                       </div>
                     </div>
@@ -3392,6 +3547,51 @@ export const SettingsSection: React.FC<SettingsSectionProps> = ({
                         />
                         <div className="w-9 h-5 bg-gray-300 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] rtl:after:left-auto rtl:after:right-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#80D141]"></div>
                       </label>
+                    </div>
+
+                    {/* Feature: Phone Reminders & Calendar Synchronization */}
+                    <div className="p-3.5 rounded-2xl bg-[#F7FAF4] dark:bg-[#1C2919] border border-[#DCEAD4] dark:border-[#2A3E26] space-y-3">
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <div className="text-xs">
+                          <div className="font-bold text-[#151E14] dark:text-[#E8F2E4] flex items-center gap-1.5">
+                            <Smartphone className="w-4 h-4 text-[#3B7E10] dark:text-[#80D141]" />
+                            <span>{isDraftFa ? 'همگام‌سازی با برنامه یادآور و تقویم گوشی' : 'Phone Reminders & Calendar Sync'}</span>
+                          </div>
+                          <div className="text-[#485B44] dark:text-[#9EB598] text-[11px] mt-1 leading-relaxed">
+                            {isDraftFa
+                              ? 'می‌توانید یادآورهای لرنی را مستقیماً در برنامه‌های رسمی یادآور گوشی (مانند Apple Reminders در آیفون، یا Google Calendar و Samsung Reminders در اندروید) ایجاد کرده یا حذف کنید.'
+                              : 'Create, export, and remove Lerni reminders directly within your native phone apps (Apple Reminders & Calendar on iOS, Google Tasks & Calendar on Android).'}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleExportAllToPhone}
+                          className="px-3.5 py-1.5 rounded-xl bg-[#80D141] hover:bg-[#72BF36] text-[#0F2600] text-xs font-bold shadow-xs flex items-center gap-1.5 transition-transform active:scale-95 shrink-0 cursor-pointer"
+                          title="Export all active reminders to a calendar file for your phone"
+                        >
+                          <CalendarPlus className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>{isDraftFa ? 'خروجی همه یادآورها برای گوشی (.ics)' : 'Export All to Phone (.ics)'}</span>
+                        </button>
+                      </div>
+
+                      <div className="p-2.5 rounded-xl bg-white dark:bg-[#202E1E] border border-[#DCEAD4] dark:border-[#2C4027] text-[11px] text-[#485B44] dark:text-[#9EB598] space-y-1.5 leading-relaxed">
+                        <div className="flex items-start gap-1.5">
+                          <span className="font-bold text-[#151E14] dark:text-[#E8F2E4] shrink-0">📲 {isDraftFa ? 'ایجاد یادآور در گوشی:' : 'Create in Phone:'}</span>
+                          <span>{isDraftFa ? 'در پنجره تنظیم هر وظیفه یا عادت، روی «افزودن به یادآور گوشی» یا «اشتراک با Reminders» بزنید تا بلافاصله با زنگ هشدار در گوشی ثبت شود.' : 'In any task or habit reminder popup, tap "Add to Phone (.ics)" or "Share to Reminders" to instantly register with native sound alarms.'}</span>
+                        </div>
+                        <div className="flex items-start gap-1.5">
+                          <span className="font-bold text-rose-700 dark:text-rose-300 shrink-0">🗑️ {isDraftFa ? 'حذف از برنامه گوشی:' : 'Remove from Phone:'}</span>
+                          <span>{isDraftFa ? 'روی هر مورد با زدن دکمه «حذف از گوشی (.ics)»، دستور لغو و پاک‌سازی رویداد برای تقویم و Reminders گوشی صادر می‌شود.' : 'Tap "Remove from Phone (.ics)" on any item to prompt your phone to delete and cancel the alarm.'}</span>
+                        </div>
+                      </div>
+
+                      {phoneExportStatus && (
+                        <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-[11px] font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          <span>{phoneExportStatus}</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Today's Scheduled Reminders Summary */}

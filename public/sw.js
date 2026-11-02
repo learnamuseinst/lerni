@@ -124,6 +124,74 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
+// Web Push Event Handler
+// Wakes up service worker when the browser or app tab is completely closed
+self.addEventListener('push', (event) => {
+  let data = {};
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch (e) {
+      data = {
+        title: 'Lerni Reminder',
+        body: event.data.text(),
+      };
+    }
+  }
+
+  const isStrong = data.intensity === 'strong';
+  const tag = data.tag || (data.id ? `lerni-rem-${data.id}` : `lerni-${Date.now()}`);
+  const isFa = Boolean(data.isFa);
+  const title = data.title || (isFa ? 'یادآور لرنی' : 'Lerni Reminder');
+  const body = data.body || '';
+
+  const notificationOptions = {
+    body,
+    icon: '/icon.svg',
+    badge: '/icon.svg',
+    tag,
+    renotify: true,
+    requireInteraction: isStrong,
+    vibrate: isStrong ? [400, 150, 400, 150, 400] : [250, 100, 250],
+    data: {
+      url: '/',
+      ...data,
+    },
+    actions: [
+      { action: 'dismiss', title: isFa ? 'رد کردن' : 'Dismiss' },
+      { action: 'snooze', title: isFa ? 'تعویق ۵ د' : 'Snooze 5m' },
+    ],
+  };
+
+  event.waitUntil(
+    (async () => {
+      await self.registration.showNotification(title, notificationOptions);
+
+      // If Strong reminder, initiate 3-second continuous re-notification in SW
+      if (isStrong && data.id) {
+        stopStrongAlarmInSW(data.id);
+        let repeatCount = 0;
+        const intervalId = setInterval(async () => {
+          repeatCount++;
+          if (repeatCount > 300 || !activeStrongAlarms.has(data.id)) {
+            clearInterval(intervalId);
+            activeStrongAlarms.delete(data.id);
+            return;
+          }
+          try {
+            await self.registration.showNotification(title, {
+              ...notificationOptions,
+              tag,
+              renotify: true,
+            });
+          } catch (err) {}
+        }, 3000);
+        activeStrongAlarms.set(data.id, { intervalId, repeatCount });
+      }
+    })()
+  );
+});
+
 // Notification Click Event: Handle Dismiss, Snooze 5m, or Open Application
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();

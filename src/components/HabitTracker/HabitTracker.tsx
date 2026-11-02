@@ -870,6 +870,7 @@ export const HabitTracker: React.FC<HabitTrackerProps> = ({
         title={reminderTargetHabit?.title || ''}
         itemType="habit"
         targetTime={reminderTargetHabit?.time}
+        itemId={reminderTargetHabit?.id}
         reminders={reminderTargetHabit?.reminders || []}
         onSave={(updatedReminders) => {
           if (!reminderTargetHabit) return;
